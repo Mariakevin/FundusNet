@@ -169,6 +169,9 @@ venv\Scripts\activate        # Windows
 # Dependencies
 pip install -r requirements.txt
 
+# Pre-commit hooks (optional, for development)
+pip install pre-commit && pre-commit install
+
 # Setup
 copy .env.example .env       # Edit as needed
 python manage.py migrate
