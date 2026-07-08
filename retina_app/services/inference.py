@@ -24,6 +24,7 @@ from retina_app.constants import (
     CONFIDENCE_THRESHOLD_REFUSE,
     ENABLE_MC_DROPOUT,
     ENSEMBLE_MIN_MODELS,
+    FUNDUS_MIN_TOP1_TOP2_RATIO,
     FUNDUS_VALIDATION_ENABLED,
     GRADCAM_MODEL,
     MAX_WORKERS,
@@ -321,6 +322,24 @@ def predict_image(
                     confidence = 0.0
                     confidence_warning = "low"
                     logger.warning(f"Classification refused: OOD entropy {norm_entropy:.4f} > {OOD_ENTROPY_THRESHOLD}")
+
+        # Top-1 / Top-2 margin check — OOD images have a narrow margin between
+        # the top class and the runner-up, while real fundus predictions have a
+        # clear winner.
+        if not is_refused and use_ensemble:
+            probs = final_result.get("probabilities")
+            if probs and len(probs) >= 2:
+                sorted_probs = sorted(probs, reverse=True)
+                margin = sorted_probs[0] / max(sorted_probs[1], 1e-8)
+                if margin < FUNDUS_MIN_TOP1_TOP2_RATIO:
+                    is_refused = True
+                    final_result["label"] = "Uncertain"
+                    confidence = 0.0
+                    confidence_warning = "low"
+                    logger.warning(
+                        f"Classification refused: top-1/top-2 margin {margin:.2f}"
+                        f" < {FUNDUS_MIN_TOP1_TOP2_RATIO}"
+                    )
 
         result = {
             "label": final_result["label"],

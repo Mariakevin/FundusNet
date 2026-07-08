@@ -8,6 +8,7 @@ ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/webp", "ima
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_IMAGE_DIMENSION = 4096
 MIN_IMAGE_DIMENSION = 64
+FUNDUS_MIN_TOP1_TOP2_RATIO = 1.8  # Require winning class score to be 1.8x second place (OOD margin)
 
 # --- Classification Categories ---
 # Must match training categories in train.py exactly
@@ -73,7 +74,7 @@ MODEL_HEALTH_MIN_ACCURACY = 0.3  # Minimum accuracy before model is flagged unhe
 CONFIDENCE_THRESHOLD_REFUSE = 0.50  # Refuse prediction if confidence is below this (OOD catch)
 CONFIDENCE_THRESHOLD_LOW = 0.5
 CONFIDENCE_THRESHOLD_HIGH = 0.7
-OOD_ENTROPY_THRESHOLD = 0.80  # Normalized entropy above this → refuse (uniform = OOD)
+OOD_ENTROPY_THRESHOLD = 0.70  # Normalized entropy above this → refuse (uniform = OOD)
 
 # --- Caching ---
 MAX_CACHE_SIZE = 100
@@ -98,8 +99,8 @@ GRADCAM_COLORMAP = "jet"  # OpenCV colormap for heatmap
 
 # --- Fundus Image Validation ---
 FUNDUS_VALIDATION_ENABLED = True
-FUNDUS_VALIDATION_THRESHOLD = 0.4  # Minimum combined score to accept as fundus
-FUNDUS_COLOR_MIN_RATIO = 0.30  # Minimum % of pixels in fundus color range (red-orange)
+FUNDUS_VALIDATION_THRESHOLD = 0.55  # Minimum combined score to accept as fundus
+FUNDUS_COLOR_MIN_RATIO = 0.35  # Minimum % of pixels in fundus color range (red-orange)
 FUNDUS_CIRCULARITY_MIN = 0.3  # Minimum circularity score for bright region
 FUNDUS_AREA_MIN_RATIO = 0.20  # Minimum bright region area ratio
 FUNDUS_AREA_MAX_RATIO = 0.90  # Maximum bright region area ratio
