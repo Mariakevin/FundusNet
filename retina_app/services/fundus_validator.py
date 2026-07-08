@@ -97,6 +97,13 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
     if perimeter == 0:
         return 0.0
 
+    # Convex hull: fundus region is convex (smooth circle/ellipse).
+    # Faces/organic shapes have concave features (eyes, mouth, hair gaps)
+    # that make contour area much smaller than convex hull area.
+    hull = cv2.convexHull(largest_contour)
+    hull_area = cv2.contourArea(hull)
+    convexity = area / hull_area if hull_area > 0 else 0.0  # 1.0 = perfectly convex
+
     # Circularity: 4*pi*area / perimeter^2 (1.0 for perfect circle)
     circularity = 4 * np.pi * area / (perimeter * perimeter)
 
@@ -136,17 +143,20 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
     elif dark_ratio > 0.2:
         surround_score = (dark_ratio - 0.2) / 0.4 * 0.5
 
-    # Score based on circularity, area ratio, and dark surround
+    # Score based on circularity, convexity, area ratio, and dark surround
     circ_score = 0.0
     if circularity >= FUNDUS_CIRCULARITY_MIN:
         circ_score = min(1.0, circularity / 0.8)
+
+    # Convexity score: 0 for non-convex (faces, irregular shapes), 1 for fundus-like
+    convex_score = max(0.0, min(1.0, (convexity - 0.7) / 0.25))
 
     area_score = 0.0
     if FUNDUS_AREA_MIN_RATIO <= area_ratio <= FUNDUS_AREA_MAX_RATIO:
         dist_from_ideal = abs(area_ratio - 0.55)
         area_score = max(0.0, 1.0 - dist_from_ideal / 0.40)
 
-    return 0.4 * circ_score + 0.3 * area_score + 0.3 * surround_score
+    return 0.30 * circ_score + 0.25 * convex_score + 0.20 * area_score + 0.25 * surround_score
 
 
 def _check_edge_density(image: np.ndarray, gray: np.ndarray = None) -> float:
@@ -336,7 +346,20 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
     # that pass on edge/texture alone.
     has_fundus_color = color_score >= 0.20
 
-    is_fundus = combined_score >= FUNDUS_VALIDATION_THRESHOLD and has_fundus_color
+    # Third gate: require circular structure.
+    # A fundus image ALWAYS has a bright circular field of view with a dark
+    # surround from the camera aperture. Faces, landscapes, and other organic
+    # images lack this and must be rejected.
+    has_circular_structure = circular_score >= 0.30
+
+    # Determine which gate failed (for messaging)
+    gate_failures = []
+    if not has_fundus_color:
+        gate_failures.append("fundus color signature")
+    if not has_circular_structure:
+        gate_failures.append("circular fundus structure")
+
+    is_fundus = combined_score >= FUNDUS_VALIDATION_THRESHOLD and has_fundus_color and has_circular_structure
 
     # Generate human-readable message
     if is_fundus:
@@ -346,8 +369,10 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
         weak_signals = []
         if color_score < 0.3:
             weak_signals.append("color pattern")
-        if circular_score < 0.3:
+        if circular_score < 0.2:
             weak_signals.append("circular structure")
+        elif circular_score < 0.3:
+            weak_signals.append("weak circular structure")
         if edge_score < 0.3:
             weak_signals.append("texture patterns")
         if green_score < 0.3:
