@@ -12,12 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import cv2
+import numpy as np
 import torch
 from django.conf import settings as django_settings
 from PIL import Image
 
 from retina_app.constants import (
     ADAPTIVE_CLAHE_ENABLED,
+    CATEGORIES,
     COLOR_CONSTANCY_ENABLED,
     CONFIDENCE_THRESHOLD_HIGH,
     CONFIDENCE_THRESHOLD_LOW,
@@ -339,6 +341,34 @@ def predict_image(
                     logger.warning(
                         f"Classification refused: top-1/top-2 margin {margin:.2f}"
                         f" < {FUNDUS_MIN_TOP1_TOP2_RATIO}"
+                    )
+
+        # Energy-based OOD detection — uses raw logits (before softmax).
+        # OOD images produce low-energy logits across ALL classes, even when
+        # the softmax-normalized top class seems confident. Energy score:
+        #   E(x) = log(sum(exp(logits_i)))
+        # Higher = in-distribution, Lower = OOD.
+        if not is_refused and use_ensemble:
+            all_logits = []
+            for _, pred in predictions:
+                logits = pred.get("logits")
+                if logits and len(logits) == len(CATEGORIES):
+                    all_logits.append(logits)
+            if len(all_logits) >= 2:
+                avg_logits = np.mean(all_logits, axis=0)
+                energy = np.log(np.sum(np.exp(avg_logits - np.max(avg_logits)))) + np.max(avg_logits)
+                n_classes = len(avg_logits)
+                # Normalize energy by the number of classes
+                # (higher n_classes = higher energy naturally)
+                energy_per_class = energy / n_classes
+                # In-distribution fundus images typically have energy_per_class > 0.8
+                if energy_per_class < 0.6:
+                    is_refused = True
+                    final_result["label"] = "Uncertain"
+                    confidence = 0.0
+                    confidence_warning = "low"
+                    logger.warning(
+                        f"Classification refused: low energy score {energy_per_class:.4f}"
                     )
 
         result = {

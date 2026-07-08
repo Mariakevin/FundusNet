@@ -37,6 +37,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
     with Image.open(image_path) as pil_img:
         image = pil_img.convert("RGB")
         if use_tta:
+            all_logits = []
             all_probs = []
             failed_transforms = []
 
@@ -71,6 +72,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
                                 logger.warning(f"Unexpected TTA output size: {output.numel()}")
                                 continue
 
+                        all_logits.append(output.detach().cpu().numpy())
                         probs = F.softmax(output, dim=0)
                         all_probs.append(probs.cpu().numpy())
                 except Exception as exc:
@@ -90,6 +92,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
             else:
                 avg_probs = sum(all_probs) / len(all_probs)
 
+            avg_logits = np.mean(np.stack(all_logits), axis=0).tolist()
             max_idx = max(range(len(avg_probs)), key=lambda i: avg_probs[i])
             confidence = avg_probs[max_idx]
 
@@ -97,6 +100,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
                 "label": CATEGORIES[max_idx],
                 "confidence": float(confidence),
                 "probabilities": avg_probs.tolist(),
+                "logits": avg_logits,
             }
 
             if failed_transforms:
@@ -134,13 +138,15 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
                     else:
                         raise InferenceError(f"Unexpected output size: {output.numel()}, expected {len(CATEGORIES)}")
 
+                logits = output.detach().cpu().numpy().tolist()
                 probabilities = F.softmax(output, dim=0)
                 confidence, predicted_idx = torch.max(probabilities, dim=0)
 
             return {
                 "label": CATEGORIES[predicted_idx.item()],
                 "confidence": float(confidence.item()),
-                "probabilities": probabilities.cpu().numpy().tolist(),
+                "probabilities": probabilities.tolist(),
+                "logits": logits,
             }
 
 
