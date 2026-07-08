@@ -21,6 +21,7 @@ from retina_app.constants import (
     COLOR_CONSTANCY_ENABLED,
     CONFIDENCE_THRESHOLD_HIGH,
     CONFIDENCE_THRESHOLD_LOW,
+    CONFIDENCE_THRESHOLD_REFUSE,
     ENABLE_MC_DROPOUT,
     ENSEMBLE_MIN_MODELS,
     FUNDUS_VALIDATION_ENABLED,
@@ -295,6 +296,12 @@ def predict_image(
             final_result["confidence"] = 0.0
             confidence_warning = "low"
             logger.warning(f"Classification refused: uncertainty={uncertainty_data['entropy']:.4f} > threshold")
+        elif confidence < CONFIDENCE_THRESHOLD_REFUSE:
+            is_refused = True
+            final_result["label"] = "Uncertain"
+            final_result["confidence"] = 0.0
+            confidence_warning = "low"
+            logger.warning(f"Classification refused: low confidence {confidence:.2f} < {CONFIDENCE_THRESHOLD_REFUSE}")
 
         result = {
             "label": final_result["label"],

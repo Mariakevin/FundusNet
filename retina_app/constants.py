@@ -70,6 +70,7 @@ MODEL_HEALTH_WINDOW = 100  # Number of recent predictions to track per model
 MODEL_HEALTH_MIN_ACCURACY = 0.3  # Minimum accuracy before model is flagged unhealthy
 
 # --- Confidence Thresholds ---
+CONFIDENCE_THRESHOLD_REFUSE = 0.35  # Refuse prediction if confidence is below this (OOD catch)
 CONFIDENCE_THRESHOLD_LOW = 0.5
 CONFIDENCE_THRESHOLD_HIGH = 0.7
 
