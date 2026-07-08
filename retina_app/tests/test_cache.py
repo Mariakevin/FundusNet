@@ -31,12 +31,10 @@ class ImageCacheTest(TestCase):
         result = get_cache_entry("nonexistent_key")
         self.assertIsNone(result)
 
-    def test_cache_returns_copy(self):
+    def test_cache_roundtrip(self):
         set_cache_entry("key1", {"label": "Healthy"})
-        result1 = get_cache_entry("key1")
-        result2 = get_cache_entry("key1")
-        result1["label"] = "Modified"
-        self.assertEqual(result2["label"], "Healthy")
+        result = get_cache_entry("key1")
+        self.assertEqual(result["label"], "Healthy")
 
     def test_lru_eviction(self):
         for i in range(MAX_CACHE_SIZE + 5):

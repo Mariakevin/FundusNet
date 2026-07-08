@@ -28,6 +28,8 @@ GRADCAM_TARGET_LAYERS = {
     "efficientnet": "features",
     "mobilenet": "features",
     "squeezenet": "features",
+    "convnext": "features",
+    "vit": "encoder",
 }
 
 
@@ -43,9 +45,18 @@ def _get_target_layer(model: nn.Module, model_type: str) -> nn.Module:
         return model.features[-1]
     elif model_type == "squeezenet":
         return model.features[12]
+    elif model_type == "convnext":
+        return model.features[-1]
+    elif model_type == "vit":
+        return model.encoder
     else:
-        # Fallback: last feature layer
-        return model.features[-1] if hasattr(model, "features") else model.layer4
+        if hasattr(model, "features"):
+            return model.features[-1]
+        elif hasattr(model, "encoder"):
+            return model.encoder
+        elif hasattr(model, "layer4"):
+            return model.layer4
+        return next(model.modules())
 
 
 class GradCAM:
@@ -135,9 +146,11 @@ class GradCAM:
         return cam_np, target_class, confidence
 
     def cleanup(self) -> None:
-        """Remove hooks to prevent memory leaks."""
+        """Remove hooks and release tensors to prevent memory leaks."""
         self._forward_handle.remove()
         self._backward_handle.remove()
+        self.activations = None
+        self.gradients = None
 
 
 def _deprocess_image(
@@ -192,11 +205,11 @@ def generate_gradcam(
     from retina_app.services.model_manager import DEVICE
 
     # Load and preprocess image
-    with Image.open(image_path).convert("RGB") as img:
+    with Image.open(image_path) as img:
+        rgb_img = img.convert("RGB")
         original_size = img.size  # (W, H)
-        original_np = np.array(img)
-
-        input_tensor = TRANSFORM(img).unsqueeze(0)
+        original_np = np.array(rgb_img)
+        input_tensor = TRANSFORM(rgb_img).unsqueeze(0)
 
     # Create GradCAM instance
     gradcam = GradCAM(model, model_type)

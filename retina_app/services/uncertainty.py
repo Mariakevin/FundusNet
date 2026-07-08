@@ -84,8 +84,6 @@ def mc_dropout_forward_pass(
     dropout_layers = _enable_dropout(model)
 
     try:
-        model.train()  # Enable dropout globally
-
         for _ in range(n_passes):
             with torch.no_grad():
                 output = model(image_tensor.to(DEVICE))
@@ -152,7 +150,8 @@ def mc_dropout_single_model(
     if input_tensor is None:
         if image_path is None:
             raise ValueError("Either image_path or input_tensor must be provided")
-        with Image.open(image_path).convert("RGB") as image:
+        with Image.open(image_path) as pil_img:
+            image = pil_img.convert("RGB")
             input_tensor = TRANSFORM(image).unsqueeze(0)
 
     mean_probs, entropy, is_uncertain = mc_dropout_forward_pass(
@@ -205,7 +204,8 @@ def mc_dropout_ensemble(
         }
 
     # Load and transform image once (avoids redundant decoding per model)
-    with Image.open(image_path).convert("RGB") as image:
+    with Image.open(image_path) as pil_img:
+        image = pil_img.convert("RGB")
         shared_tensor = TRANSFORM(image).unsqueeze(0)
 
     all_model_results = []

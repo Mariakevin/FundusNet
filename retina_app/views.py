@@ -3,14 +3,16 @@ Views for FundusNet — single-page screening tool.
 """
 
 import os
+import mimetypes
 import logging
-from typing import Dict, Any
 from django.http import HttpRequest, HttpResponse, FileResponse, Http404
 from django.shortcuts import render
 from django.conf import settings
+from django.core.files.storage import default_storage
 
 from .forms import ImageUploadForm
 from .models import UploadedImage
+from .constants import CATEGORIES
 from .services.inference import predict_image
 from .services.exceptions import (
     InferenceError,
@@ -26,17 +28,6 @@ from .services.exceptions import (
 logger = logging.getLogger("retina_app")
 
 
-def _handle_upload(request: HttpRequest):
-    """Process image upload from request."""
-    form = ImageUploadForm(request.POST, request.FILES)
-    if form.is_valid():
-        uploaded_image = form.save(commit=False)
-        uploaded_image.user = None
-        uploaded_image.save()
-        return uploaded_image
-    return None
-
-
 def index_view(request: HttpRequest) -> HttpResponse:
     """Single-page view: upload zone + inline result display."""
     result = None
@@ -44,11 +35,9 @@ def index_view(request: HttpRequest) -> HttpResponse:
     image_url = None
 
     if request.method == "POST":
-        uploaded_image = _handle_upload(request)
-        if uploaded_image is None:
-            form = ImageUploadForm(request.POST, request.FILES)
-            error_message = "Invalid image. Please select a JPG or PNG file under 10MB."
-        else:
+        form = ImageUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_image = form.save()
             image_path = os.path.join(settings.MEDIA_ROOT, uploaded_image.image.name)
             image_url = uploaded_image.image.url
 
@@ -57,7 +46,6 @@ def index_view(request: HttpRequest) -> HttpResponse:
                 probabilities = prediction_data.get("probabilities", [])
                 prob_labels = []
                 if probabilities:
-                    from retina_app.constants import CATEGORIES
                     prob_labels = [(cat, prob * 100) for cat, prob in zip(CATEGORIES, probabilities)]
                     prob_labels.sort(key=lambda x: x[1], reverse=True)
 
@@ -83,6 +71,8 @@ def index_view(request: HttpRequest) -> HttpResponse:
                 error_message = f"Processing failed: {str(exc)}"
             except NotAFundusImageError as exc:
                 error_message = str(exc)
+        else:
+            error_message = "Invalid image. Please select a JPG or PNG file under 10MB."
 
     return render(request, "index.html", {
         "result": result,
@@ -93,12 +83,15 @@ def index_view(request: HttpRequest) -> HttpResponse:
 
 def protected_media(request: HttpRequest, path: str) -> HttpResponse:
     """Serve media files without auth."""
-    import mimetypes
-    from django.core.files.storage import default_storage
-
     full_path = os.path.join(settings.MEDIA_ROOT, path)
 
-    if not os.path.realpath(full_path).startswith(os.path.realpath(settings.MEDIA_ROOT)):
+    try:
+        real_path = os.path.realpath(full_path)
+        media_root = os.path.realpath(settings.MEDIA_ROOT)
+    except OSError:
+        raise Http404("File not found")
+
+    if not real_path.startswith(media_root):
         raise Http404("File not found")
 
     if not default_storage.exists(full_path):
@@ -108,7 +101,10 @@ def protected_media(request: HttpRequest, path: str) -> HttpResponse:
     if not content_type:
         content_type = "application/octet-stream"
 
-    file = default_storage.open(full_path)
-    response = FileResponse(file, content_type=content_type)
-    response["Cache-Control"] = "public, max-age=86400"
-    return response
+    try:
+        file = default_storage.open(full_path)
+        response = FileResponse(file, content_type=content_type)
+        response["Cache-Control"] = "public, max-age=86400"
+        return response
+    except FileNotFoundError:
+        raise Http404("File not found")

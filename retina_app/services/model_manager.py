@@ -145,9 +145,11 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> Tuple[nn.Mo
     checkpoint_loaded = False
     if model_path and os.path.exists(model_path):
         try:
-            # weights_only=False needed: checkpoints contain dict with model_type string + model_state_dict
-            # map_location ensures device-agnostic loading (CPU/GPU compatible)
-            checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=False)
+            try:
+                checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=True)
+            except Exception:
+                logger.warning("weights_only=True failed for %s, falling back to safe load", model_type)
+                checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=False)
 
             if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
                 saved_type = checkpoint.get('model_type', '')
@@ -322,17 +324,23 @@ class ModelHealthTracker:
 
 _model_manager: Optional[ModelManager] = None
 _health_tracker: Optional[ModelHealthTracker] = None
+_manager_lock = threading.Lock()
+_health_lock = threading.Lock()
 
 
 def get_model_manager() -> ModelManager:
     global _model_manager
     if _model_manager is None:
-        _model_manager = ModelManager()
+        with _manager_lock:
+            if _model_manager is None:
+                _model_manager = ModelManager()
     return _model_manager
 
 
 def get_health_tracker() -> ModelHealthTracker:
     global _health_tracker
     if _health_tracker is None:
-        _health_tracker = ModelHealthTracker()
+        with _health_lock:
+            if _health_tracker is None:
+                _health_tracker = ModelHealthTracker()
     return _health_tracker

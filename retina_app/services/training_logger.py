@@ -82,14 +82,16 @@ class TrainingLogger:
         self._write_csv()
 
     def _write_csv(self) -> None:
-        """Write all epoch records to CSV."""
+        """Append new epoch records to CSV."""
         if not self.epochs:
             return
         fieldnames = list(self.epochs[0].keys())
-        with open(self._csv_path, "w", newline="") as f:
+        write_header = not self._csv_path.exists()
+        with open(self._csv_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(self.epochs)
+            if write_header:
+                writer.writeheader()
+            writer.writerow(self.epochs[-1])
 
     def finalize(self) -> Dict[str, Any]:
         """Write final summary and return it.

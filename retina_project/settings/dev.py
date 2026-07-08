@@ -10,7 +10,7 @@ import os
 # Security - relaxed for development
 DEBUG = os.getenv("DJANGO_DEBUG", "True").strip().lower() in {"1", "true", "yes", "on"}
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-dev-key-change-me")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me-before-deployment")
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()]
 

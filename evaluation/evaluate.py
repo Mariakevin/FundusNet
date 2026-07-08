@@ -128,15 +128,15 @@ def evaluate_ensemble(models, image_path, model_weights=None, use_tta=False,
     if len(individual_preds) < 2:
         return None
 
-    pred_list = list(individual_preds.values())
-    agreement_info = detect_model_disagreement(pred_list)
+    pred_items = list(individual_preds.items())
+    agreement_info = detect_model_disagreement(pred_items)
 
     if use_selective and agreement_info["agreement_level"] < 0.5:
-        result = selective_ensemble(pred_list, min_agreement=0.5)
+        result = selective_ensemble(pred_items, min_agreement=0.5)
         if result:
             return {
                 "label": result["label"],
-                "label_name": CATEGORIES[result["label"]],
+                "label_name": result["label"],
                 "confidence": result["confidence"],
                 "probabilities": result["probabilities"],
                 "uncertainty": result.get("uncertainty", 0.0),

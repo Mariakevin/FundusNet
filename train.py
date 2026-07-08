@@ -42,7 +42,10 @@ args = parser.parse_args()
 DATASET_PATH = args.dataset
 OUTPUT_DIR = args.output
 
-CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
+try:
+    from retina_app.constants import CATEGORIES
+except ImportError:
+    CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
 CLASS_TO_IDX = {cat: idx for idx, cat in enumerate(CATEGORIES)}
 
 BATCH_SIZE = args.batch_size
@@ -171,22 +174,31 @@ def train_model(model_name, patience=5):
     train_size = int(0.8 * total_size)
     val_size = total_size - train_size
     
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        full_dataset, [train_size, val_size],
-        generator=torch.Generator().manual_seed(SEED)
-    )
+    indices = list(range(total_size))
+    train_indices, val_indices = indices[:train_size], indices[train_size:]
     
-    val_dataset.dataset.transform = val_transform
+    train_dataset = RetinaDataset(DATASET_PATH, transform=train_transform)
+    val_dataset = RetinaDataset(DATASET_PATH, transform=val_transform)
     
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    from torch.utils.data import Subset
+    train_dataset = Subset(train_dataset, train_indices)
+    val_dataset = Subset(val_dataset, val_indices)
+    
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=os.cpu_count() or 4)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=os.cpu_count() or 4)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = create_model(model_name, len(CATEGORIES))
     model = model.to(device)
     
-    # Class weights inversely proportional to frequency to handle 3:1 imbalance
-    class_weights = torch.tensor([1.0, 3.0, 3.0, 3.0], device=device)
+    class_counts = [0] * len(CATEGORIES)
+    for _, label_idx in full_dataset.samples:
+        class_counts[label_idx] += 1
+    total = sum(class_counts)
+    class_weights = torch.tensor(
+        [total / (len(CATEGORIES) * max(c, 1)) for c in class_counts],
+        device=device,
+    )
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)

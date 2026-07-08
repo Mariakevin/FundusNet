@@ -5,6 +5,9 @@ All public API remains importable from this module for backward compatibility.
 
 import os
 import time
+import tempfile
+import atexit
+import threading
 import logging
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -21,8 +24,6 @@ from retina_app.constants import (
     MAX_WORKERS,
     CONFIDENCE_THRESHOLD_LOW,
     CONFIDENCE_THRESHOLD_HIGH,
-    MAX_CACHE_SIZE,
-    MAX_CACHE_MEMORY_MB,
     ENABLE_MC_DROPOUT,
     GRADCAM_MODEL,
     UNCERTAINTY_REFUSAL_MESSAGE,
@@ -46,6 +47,12 @@ from retina_app.services.preprocessing import (
     validate_image_file,
     check_image_quality,
     preprocess_fundus,
+    apply_adaptive_clahe,
+    reduce_noise,
+    apply_color_constancy,
+    apply_clahe,
+    generate_preprocessing_viz,
+    save_preprocessing_viz,
 )
 from retina_app.services.fundus_validator import validate_fundus_image
 from retina_app.services.model_manager import (
@@ -64,6 +71,7 @@ from retina_app.services.ensemble import (
     detect_model_disagreement,
     predict_with_uncertainty_ensemble,
 )
+from retina_app.services.gradcam import generate_gradcam, get_gradcam_output_path
 from retina_app.services.image_cache import (
     _get_image_hash,
     get_cache_entry,
@@ -71,10 +79,22 @@ from retina_app.services.image_cache import (
     clear_image_cache,
     get_cache_stats,
 )
+from django.conf import settings as django_settings
 
 logger = logging.getLogger("retina_app")
 
-executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+_executor = None
+_executor_lock = threading.Lock()
+
+
+def get_executor():
+    global _executor
+    if _executor is None:
+        with _executor_lock:
+            if _executor is None:
+                _executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+                atexit.register(_executor.shutdown, wait=False)
+    return _executor
 
 
 def predict_image(
@@ -134,23 +154,23 @@ def predict_image(
     preprocessed_path = None
     if use_clahe:
         try:
-            from retina_app.services.preprocessing import apply_adaptive_clahe, reduce_noise, apply_color_constancy
             preprocessed = preprocess_fundus(image_path, enhance=False, detect_roi=False)
             if ADAPTIVE_CLAHE_ENABLED:
                 preprocessed = apply_adaptive_clahe(preprocessed)
             else:
-                from retina_app.services.preprocessing import apply_clahe
                 preprocessed = apply_clahe(preprocessed)
             if NOISE_REDUCTION_ENABLED:
                 preprocessed = reduce_noise(preprocessed)
             if COLOR_CONSTANCY_ENABLED:
                 preprocessed = apply_color_constancy(preprocessed)
-            base, ext = os.path.splitext(image_path)
-            preprocessed_path = f"{base}_clahe{ext}"
+            ext = os.path.splitext(image_path)[1]
+            img_hash = _get_image_hash(image_path)
+            tmp_dir = tempfile.gettempdir()
+            preprocessed_path = os.path.join(tmp_dir, f"fundus_{img_hash}_clahe{ext}")
             cv2.imwrite(preprocessed_path, cv2.cvtColor(preprocessed, cv2.COLOR_RGB2BGR))
-            logger.info(f"Applied preprocessing pipeline to {image_path}")
+            logger.info("Applied preprocessing pipeline to %s", image_path)
         except Exception as exc:
-            logger.warning(f"Preprocessing failed, using original: {exc}")
+            logger.warning("Preprocessing failed, using original: %s", exc)
             preprocessed_path = None
 
     target_path = preprocessed_path if preprocessed_path else image_path
@@ -187,7 +207,7 @@ def predict_image(
             )
 
             predictions = predict_models_parallel(
-                model_manager._models, target_path, use_tta, executor
+                model_manager._models, target_path, use_tta, get_executor()
             )
 
             health_tracker = get_health_tracker()
@@ -262,28 +282,25 @@ def predict_image(
         gradcam_data = None
         if use_gradcam:
             try:
-                from retina_app.services.gradcam import generate_gradcam, get_gradcam_output_path
-                from django.conf import settings
-
                 gradcam_model_type = GRADCAM_MODEL
                 if gradcam_model_type in model_manager._models:
                     gradcam_model = model_manager._models[gradcam_model_type]
                     gradcam_output = get_gradcam_output_path(
-                        settings.MEDIA_ROOT, os.path.basename(image_path)
+                        django_settings.MEDIA_ROOT, os.path.basename(image_path)
                     )
                     gradcam_result = generate_gradcam(
                         gradcam_model, target_path, gradcam_model_type,
                         output_path=gradcam_output,
                     )
-                    gradcam_url = f"{settings.MEDIA_URL}gradcam/{os.path.basename(gradcam_output)}"
+                    gradcam_url = f"{django_settings.MEDIA_URL}gradcam/{os.path.basename(gradcam_output)}"
                     gradcam_data = {
                         "url": gradcam_url,
                         "predicted_class": gradcam_result["predicted_class"],
                         "confidence": gradcam_result["confidence"],
                     }
-                    logger.info(f"Grad-CAM generated: {gradcam_url}")
+                    logger.info("Grad-CAM generated: %s", gradcam_url)
             except Exception as exc:
-                logger.warning(f"Grad-CAM generation failed: {exc}")
+                logger.warning("Grad-CAM generation failed: %s", exc)
 
         # --- Selective Refusal ---
         is_refused = False
@@ -344,9 +361,6 @@ def predict_image(
         # --- Preprocessing Visualization ---
         if PREPROCESSING_VIZ_ENABLED:
             try:
-                from retina_app.services.preprocessing import generate_preprocessing_viz, save_preprocessing_viz
-                from django.conf import settings as django_settings
-
                 viz_panels = generate_preprocessing_viz(image_path)
                 viz_dir = os.path.join(django_settings.MEDIA_ROOT, "preprocessing_viz")
                 os.makedirs(viz_dir, exist_ok=True)
@@ -355,9 +369,9 @@ def predict_image(
                 save_preprocessing_viz(viz_panels, viz_path)
                 viz_url = f"{django_settings.MEDIA_URL}preprocessing_viz/{viz_filename}"
                 result["preprocessing_viz_url"] = viz_url
-                logger.info(f"Preprocessing visualization saved: {viz_url}")
+                logger.info("Preprocessing visualization saved: %s", viz_url)
             except Exception as exc:
-                logger.warning(f"Preprocessing visualization failed: {exc}")
+                logger.warning("Preprocessing visualization failed: %s", exc)
 
         set_cache_entry(cache_key, result)
 

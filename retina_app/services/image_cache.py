@@ -2,12 +2,14 @@
 In-memory image cache with LRU eviction.
 """
 
-import copy
 import hashlib
+import sys
 import threading
 import logging
 from typing import Dict, Any, Optional
 from collections import OrderedDict
+
+import numpy as np
 
 from retina_app.constants import MAX_CACHE_SIZE, MAX_CACHE_MEMORY_MB
 
@@ -28,10 +30,10 @@ def _get_image_hash(image_path: str) -> str:
 
 
 def get_cache_entry(cache_key: str) -> Optional[Dict[str, Any]]:
-    """Retrieve an item from cache. Returns None on miss. Returns deep copy."""
+    """Retrieve an item from cache. Returns None on miss."""
     with _cache_lock:
         if cache_key in IMAGE_CACHE:
-            return copy.deepcopy(IMAGE_CACHE[cache_key])
+            return IMAGE_CACHE[cache_key]
     return None
 
 
@@ -46,27 +48,27 @@ def set_cache_entry(cache_key: str, result: Dict[str, Any]) -> None:
             _, evicted = IMAGE_CACHE.popitem(last=False)
             _cache_memory_bytes -= _estimate_size(evicted)
 
-        # Deep copy to prevent downstream mutation
-        entry = copy.deepcopy(result)
-        entry_size = _estimate_size(entry)
+        entry_size = _estimate_size(result)
         _cache_memory_bytes += entry_size
-        IMAGE_CACHE[cache_key] = entry
+        IMAGE_CACHE[cache_key] = result
 
 
 def _estimate_size(obj: Any) -> int:
     """Estimate memory size of a result dict (recursive for nested structures)."""
-    if isinstance(obj, dict):
-        return sum(_estimate_size(k) + _estimate_size(v) for k, v in obj.items())
+    if isinstance(obj, np.ndarray):
+        return obj.nbytes
+    elif isinstance(obj, dict):
+        return sys.getsizeof(obj) + sum(_estimate_size(k) + _estimate_size(v) for k, v in obj.items())
     elif isinstance(obj, (list, tuple)):
-        return sum(_estimate_size(item) for item in obj)
+        return sys.getsizeof(obj) + sum(_estimate_size(item) for item in obj)
     elif isinstance(obj, str):
-        return len(obj.encode('utf-8'))
-    elif isinstance(obj, (int, float)):
-        return 8
+        return sys.getsizeof(obj) + len(obj.encode('utf-8'))
+    elif isinstance(obj, (int, float, bool)):
+        return sys.getsizeof(obj)
     elif hasattr(obj, 'nbytes'):
         return obj.nbytes
     else:
-        return 64  # baseline estimate for unknown types
+        return sys.getsizeof(obj)
 
 
 def clear_image_cache() -> Dict[str, int]:

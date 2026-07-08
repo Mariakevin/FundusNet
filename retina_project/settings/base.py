@@ -103,6 +103,10 @@ AXES_LOCK_OUT_AT_FAILURE = os.getenv("AXES_LOCK_OUT_AT_FAILURE", "False").strip(
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 AXES_USE_ATTEMPT_EXPIRATION = True
 
+# Ensure log directory exists
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 # Logging configuration
 LOGGING = {
     "version": 1,
@@ -117,7 +121,7 @@ LOGGING = {
         "file": {
             "level": "WARNING",
             "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "retina_audit.log",
+            "filename": LOG_DIR / "retina_audit.log",
             "formatter": "verbose",
         },
         "console": {
@@ -139,6 +143,14 @@ LOGGING = {
         },
     },
 }
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Strict"
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Strict"
 
 # Cache configuration for rate limiting
 CACHES = {

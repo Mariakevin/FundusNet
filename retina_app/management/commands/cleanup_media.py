@@ -4,10 +4,10 @@ Deletes uploaded images older than MEDIA_RETENTION_DAYS and their associated fil
 """
 
 from django.core.management.base import BaseCommand
+from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.conf import settings
 from datetime import timedelta
-import os
 import logging
 
 from retina_app.models import UploadedImage, PredictionRecord
@@ -36,7 +36,6 @@ class Command(BaseCommand):
 
         cutoff_date = timezone.now() - timedelta(days=days)
 
-        # Find old images
         old_images = UploadedImage.objects.filter(uploaded_at__lt=cutoff_date)
         count = old_images.count()
 
@@ -50,19 +49,16 @@ class Command(BaseCommand):
                 self.stdout.write(f"  - {img.image.name} (uploaded: {img.uploaded_at})")
             return
 
-        # Delete images and files
+        PredictionRecord.objects.filter(uploaded_image__in=old_images).update(is_deleted=True)
+
         deleted_count = 0
         for img in old_images:
             try:
-                # Soft-delete prediction records first
-                PredictionRecord.objects.filter(uploaded_image=img).update(is_deleted=True)
+                if img.image and img.image.name:
+                    if default_storage.exists(img.image.name):
+                        default_storage.delete(img.image.name)
+                        logger.info("Deleted media file: %s", img.image.name)
 
-                # Delete file from storage
-                if img.image and os.path.exists(img.image.path):
-                    os.remove(img.image.path)
-                    logger.info("Deleted media file: %s", img.image.name)
-
-                # Delete the database record (will SET_NULL on PredictionRecord.uploaded_image)
                 img.delete()
                 deleted_count += 1
 

@@ -37,7 +37,8 @@ def apply_temperature_scaling(logits: torch.Tensor, temperature: float = TEMPERA
 
 def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = False) -> Dict[str, Any]:
     """Run inference on a single model with optional test-time augmentation."""
-    with Image.open(image_path).convert("RGB") as image:
+    with Image.open(image_path) as pil_img:
+        image = pil_img.convert("RGB")
         if use_tta:
             all_probs = []
             failed_transforms = []
