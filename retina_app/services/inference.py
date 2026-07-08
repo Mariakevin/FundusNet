@@ -30,6 +30,7 @@ from retina_app.constants import (
     MODEL_LIST,
     MODEL_WEIGHTS,
     NOISE_REDUCTION_ENABLED,
+    OOD_ENTROPY_THRESHOLD,
     PREPROCESSING_VIZ_ENABLED,
     UNCERTAINTY_REFUSAL_MESSAGE,
 )
@@ -302,6 +303,24 @@ def predict_image(
             final_result["confidence"] = 0.0
             confidence_warning = "low"
             logger.warning(f"Classification refused: low confidence {confidence:.2f} < {CONFIDENCE_THRESHOLD_REFUSE}")
+
+        # OOD detection via normalized entropy of ensemble probabilities.
+        # OOD images produce near-uniform predictions (high entropy) even when
+        # the max confidence is above the refusal threshold. In-distribution
+        # fundus images have peaked distributions (low entropy).
+        if not is_refused and use_ensemble:
+            probs = final_result.get("probabilities")
+            if probs and len(probs) > 1:
+                import numpy as np
+                from scipy.stats import entropy as scipy_entropy
+
+                norm_entropy = scipy_entropy(probs) / np.log(len(probs))
+                if norm_entropy > OOD_ENTROPY_THRESHOLD:
+                    is_refused = True
+                    final_result["label"] = "Uncertain"
+                    confidence = 0.0
+                    confidence_warning = "low"
+                    logger.warning(f"Classification refused: OOD entropy {norm_entropy:.4f} > {OOD_ENTROPY_THRESHOLD}")
 
         result = {
             "label": final_result["label"],
