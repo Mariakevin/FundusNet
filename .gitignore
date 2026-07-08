@@ -48,5 +48,9 @@ logs/
 .impeccable/
 .opencode/
 
+# Dataset — download separately (see scripts/download_dataset.py)
+retina_dataset/
+!retina_dataset/.gitkeep
+
 # Documentation screenshots (keep in docs/screenshots/)
 docs/screenshots/

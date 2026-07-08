@@ -141,6 +141,19 @@ FundusNet/
 
 ---
 
+## Getting the Dataset
+
+Run the download script to fetch and organise the ODIR-5K dataset:
+
+```bash
+pip install kagglehub tqdm
+python scripts/download_dataset.py
+```
+
+If automatic download is unavailable, the script prints instructions for manual download from [Kaggle — Ocular Disease Recognition (ODIR-5K)](https://www.kaggle.com/datasets/andrewmvd/ocular-disease-recognition-odir5k). Once placed in `retina_dataset/`, re-run the script to verify.
+
+---
+
 ## ⚡ Quick Start
 
 ```bash
