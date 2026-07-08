@@ -209,7 +209,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   justify-content: center;
   padding: var(--space-8) 0;
 }
-.retina-form { width: 100%; max-width: 400px; }
+.retina-form { width: 100%; max-width: 400px; text-align: center; }
 
 /* Signature: Circular Dropzone */
 .retina-dropzone {
