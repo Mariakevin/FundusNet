@@ -65,25 +65,25 @@ graph TD
     B --> C[Quality Check]
     C --> D[Preprocessing]
     D --> E[6-Model Ensemble]
-    
+
     E --> F1[EfficientNet-B0]
     E --> F2[ResNet50]
     E --> F3[SqueezeNet1.0]
     E --> F4[MobileNetV3]
     E --> F5[ConvNeXt-Tiny]
     E --> F6[ViT-B/16]
-    
-    F1 & F2 & F3 & F4 & F5 & F6 --> G{Agreement ≥ 0.5?}
+
+    F1 & F2 & F3 & F4 & F5 & F6 --> G{Agreement >= 0.5?}
     G -->|Yes| H[Weighted Ensemble]
     G -->|No| I[Selective Filtering]
     I --> H
-    
-    H --> J[MC Dropout<br/>(T=10 passes)]
-    J --> K{Uncertainty < τ?}
+
+    H --> J[MC Dropout T=10]
+    J --> K{Uncertainty < threshold?}
     K -->|Yes| L[Prediction + Grad-CAM]
-    K -->|No| M[Refuse: refer to specialist]
-    
-    L --> N[4-Class Output<br/>Confidence · Heatmap · Report]
+    K -->|No| M[Refuse - refer to specialist]
+
+    L --> N[4-Class Output]
 ```
 
 **Uncertainty-aware refusal** — When MC Dropout entropy exceeds a threshold, the system refuses to classify and recommends manual review — a critical safety feature for clinical deployment.
