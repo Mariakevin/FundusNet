@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Testing
+# (Django test framework is built-in)
+
+# Code quality
+flake8>=7.0.0
+black>=24.0.0
+isort>=5.13.0
+
+# Development tools
+ipython>=8.0.0

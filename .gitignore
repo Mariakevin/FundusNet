@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.env
+
+# Django
+db.sqlite3
+media/uploads/
+media/uploaded_images/
+media/gradcam/
+media/preprocessing_viz/
+
+# ML model files
+models/*.pth
+*.pth
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Evaluation output
+evaluation_results/
+figures_output/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+
+# Tool directories
+.playwright-mcp/
+.impeccable/
+.opencode/
+
+# Documentation screenshots (keep in docs/screenshots/)
+docs/screenshots/

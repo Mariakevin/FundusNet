@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}FundusNet — AI-Powered Retinal Screening{% endblock %}
+{% block content %}
+<div class="retina-page">
+
+  <header class="retina-header">
+    <a href="/" class="retina-brand" aria-label="FundusNet home">
+      <div class="retina-brand-icon"><i data-lucide="eye" aria-hidden="true"></i></div>
+      <span class="retina-brand-name">FundusNet</span>
+    </a>
+    <span class="retina-header-info">AI-Assisted Screening</span>
+  </header>
+
+  {% if error_message %}
+  <div class="retina-alert retina-alert-error" role="alert">
+    <i data-lucide="alert-circle" aria-hidden="true"></i>
+    <span>{{ error_message }}</span>
+  </div>
+  {% endif %}
+
+  {% if not result %}
+  <div class="retina-upload-section">
+    <form method="post" enctype="multipart/form-data" id="upload-form" class="retina-form">
+      {% csrf_token %}
+      <label for="id_image" class="retina-dropzone" id="dropzone">
+        <div class="retina-dropzone-glow" aria-hidden="true"></div>
+        <input type="file" name="image" id="id_image" accept=".jpg,.jpeg,.png" required>
+        <div id="dropzone-placeholder" class="retina-dropzone-inner">
+          <div class="retina-dropzone-icon"><i data-lucide="upload-cloud" aria-hidden="true"></i></div>
+          <div class="retina-dropzone-text">
+            <strong>Upload fundus image</strong>
+            <span>JPG or PNG &middot; up to 10MB</span>
+          </div>
+        </div>
+        <div id="preview-container" class="retina-preview hidden">
+          <img id="image-preview" class="retina-preview-img" alt="Selected retinal image">
+          <p class="retina-preview-hint">Tap to change</p>
+        </div>
+      </label>
+
+      <button type="submit" class="retina-btn retina-btn-primary retina-btn-full" id="submit-btn" disabled>
+        <span id="submit-text" class="retina-btn-text">Analyze Image</span>
+        <span class="retina-btn-loader">
+          <i data-lucide="loader-2" aria-hidden="true"></i>
+          Analyzing&hellip;
+        </span>
+      </button>
+    </form>
+
+    <div class="retina-conditions" aria-label="Detectable conditions">
+      <div class="retina-condition">
+        <span class="retina-condition-dot retina-condition-dot-healthy" aria-hidden="true"></span>
+        <span>Healthy</span>
+      </div>
+      <div class="retina-condition">
+        <span class="retina-condition-dot retina-condition-dot-cataract" aria-hidden="true"></span>
+        <span>Cataract</span>
+      </div>
+      <div class="retina-condition">
+        <span class="retina-condition-dot retina-condition-dot-glaucoma" aria-hidden="true"></span>
+        <span>Glaucoma</span>
+      </div>
+      <div class="retina-condition">
+        <span class="retina-condition-dot retina-condition-dot-retina" aria-hidden="true"></span>
+        <span>Retina Disease</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if result %}
+  <div class="retina-result">
+
+    {% if result.is_refused %}
+    <div class="retina-alert retina-alert-warning" role="alert">
+      <i data-lucide="alert-triangle" aria-hidden="true"></i>
+      <div>
+        <strong>Classification Refused</strong>
+        <p>{{ result.refusal_message }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="retina-hero">
+      {% if result.image_url %}
+      <div class="retina-hero-image-wrap">
+        <img src="{{ result.image_url }}" alt="Analyzed retinal fundus image" class="retina-hero-image">
+        <div class="retina-hero-glow" aria-hidden="true"></div>
+      </div>
+      {% endif %}
+
+      <div class="retina-hero-info">
+        <div class="retina-verdict">
+          <h2 class="retina-prediction {% if result.prediction == 'Healthy' %}retina-prediction-healthy{% elif result.prediction == 'Uncertain' %}retina-prediction-uncertain{% else %}retina-prediction-abnormal{% endif %}">
+            {{ result.prediction }}
+          </h2>
+          <p class="retina-verdict-sub">
+            {% if result.prediction == 'Healthy' %}
+            No signs of retinal disease detected.
+            {% elif result.prediction == 'Uncertain' %}
+            The model cannot confidently classify this image. Manual review recommended.
+            {% else %}
+            Abnormal findings detected. Further examination recommended.
+            {% endif %}
+          </p>
+        </div>
+
+        {% if result.confidence is not None %}
+        <div class="retina-confidence">
+          <span class="retina-confidence-value">{{ result.confidence|floatformat:1 }}%</span>
+          <span class="retina-confidence-label">confidence</span>
+        </div>
+        {% endif %}
+
+        <div class="retina-badges">
+          <span class="retina-badge {% if result.prediction == 'Healthy' %}retina-badge-healthy{% elif result.prediction == 'Uncertain' %}retina-badge-uncertain{% else %}retina-badge-abnormal{% endif %}">
+            {% if result.prediction == 'Healthy' %}<i data-lucide="check-circle" aria-hidden="true"></i>Low Risk{% elif result.prediction == 'Uncertain' %}<i data-lucide="alert-triangle" aria-hidden="true"></i>Uncertain{% else %}<i data-lucide="alert-circle" aria-hidden="true"></i>High Risk{% endif %}
+          </span>
+          <span class="retina-badge retina-badge-model"><i data-lucide="layers" aria-hidden="true"></i>{{ result.model_version|default:"Ensemble" }}</span>
+          {% if result.uncertainty %}
+          <span class="retina-badge retina-badge-uncertainty" title="Entropy: {{ result.uncertainty.entropy|floatformat:3 }}">
+            {% if result.uncertainty.is_uncertain %}<i data-lucide="help-circle" aria-hidden="true"></i>High Uncertainty{% elif result.uncertainty.entropy > 0.15 %}<i data-lucide="minus-circle" aria-hidden="true"></i>Medium{% else %}<i data-lucide="check-circle" aria-hidden="true"></i>Low Uncertainty{% endif %}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="retina-alert retina-alert-info" role="alert">
+      <i data-lucide="info" aria-hidden="true"></i>
+      <span>AI-assisted screening result. Please consult an ophthalmologist for final diagnosis.</span>
+    </div>
+
+    {% if result.prob_labels %}
+    <div class="retina-card">
+      <h3 class="retina-card-title">
+        <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+        Class Probabilities
+      </h3>
+      <div class="retina-probs">
+        {% for label, prob in result.prob_labels %}
+        <div class="retina-prob">
+          <span class="retina-prob-label {% if label == result.prediction %}retina-prob-label-active{% endif %}">{{ label }}</span>
+          <div class="retina-prob-bar">
+            <div class="retina-prob-fill {% if label == result.prediction %}retina-prob-fill-active{% endif %}" role="progressbar" aria-valuenow="{{ prob|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ label }} probability" style="width:{{ prob }}%;"></div>
+          </div>
+          <span class="retina-prob-value">{{ prob|floatformat:1 }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.gradcam_url %}
+    <div class="retina-card">
+      <h3 class="retina-card-title">
+        <i data-lucide="flame" aria-hidden="true"></i>
+        Explainability Heatmap
+      </h3>
+      <div class="retina-viz">
+        <img src="{{ result.gradcam_url }}" alt="Grad-CAM heatmap highlighting regions influencing the classification" class="retina-viz-img" loading="lazy">
+        <p class="retina-viz-caption">Regions that most influenced the classification decision.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.preprocessing_viz_url %}
+    <div class="retina-card">
+      <h3 class="retina-card-title">
+        <i data-lucide="layers" aria-hidden="true"></i>
+        Preprocessing Pipeline
+      </h3>
+      <div class="retina-viz">
+        <img src="{{ result.preprocessing_viz_url }}" alt="Preprocessing pipeline visualization showing CLAHE, noise reduction, and color constancy" class="retina-viz-img" loading="lazy">
+        <p class="retina-viz-caption">Adaptive CLAHE, noise reduction, and color constancy applied before analysis.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <a href="/" class="retina-btn retina-btn-primary retina-new-analysis">
+      <i data-lucide="plus" aria-hidden="true"></i>
+      New Analysis
+    </a>
+
+  </div>
+  {% endif %}
+
+  {% if not result %}
+  <section class="retina-how-section" aria-label="How FundusNet works">
+    <h2 class="retina-how-title">How It Works</h2>
+    <div class="retina-how-grid">
+      <div class="retina-how-step">
+        <div class="retina-how-number" aria-hidden="true">1</div>
+        <h3 class="retina-how-step-title">Upload Image</h3>
+        <p class="retina-how-step-desc">Submit a fundus photograph in JPG or PNG format.</p>
+      </div>
+      <div class="retina-how-step">
+        <div class="retina-how-number" aria-hidden="true">2</div>
+        <h3 class="retina-how-step-title">AI Analysis</h3>
+        <p class="retina-how-step-desc">Six deep learning models analyze the image in ensemble.</p>
+      </div>
+      <div class="retina-how-step">
+        <div class="retina-how-number" aria-hidden="true">3</div>
+        <h3 class="retina-how-step-title">Get Results</h3>
+        <p class="retina-how-step-desc">View prediction, confidence, and explainability heatmap.</p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <footer class="retina-footer">
+    <span>FundusNet &middot; AI-Assisted Retinal Screening</span>
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var fileInput = document.getElementById('id_image');
+  var zone = document.getElementById('dropzone');
+  var preview = document.getElementById('preview-container');
+  var placeholder = document.getElementById('dropzone-placeholder');
+  var imgPreview = document.getElementById('image-preview');
+  var submitBtn = document.getElementById('submit-btn');
+
+  if (!fileInput) return;
+
+  var MAX_SIZE = 10 * 1024 * 1024;
+  var ALLOWED = ['image/jpeg', 'image/png'];
+
+  function validateFile(file) {
+    if (!file) return false;
+    if (ALLOWED.indexOf(file.type) === -1) return false;
+    if (file.size > MAX_SIZE) return false;
+    return true;
+  }
+
+  function handleFile(file) {
+    if (!validateFile(file)) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      imgPreview.src = e.target.result;
+      placeholder.style.display = 'none';
+      preview.classList.remove('hidden');
+      submitBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
+
+  zone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    zone.classList.add('retina-dropzone-over');
+  });
+  zone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    zone.classList.remove('retina-dropzone-over');
+  });
+  zone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    zone.classList.remove('retina-dropzone-over');
+    var file = e.dataTransfer.files[0];
+    if (file) {
+      fileInput.files = e.dataTransfer.files;
+      handleFile(file);
+    }
+  });
+
+  document.getElementById('upload-form').addEventListener('submit', function() {
+    submitBtn.disabled = true;
+    submitBtn.classList.add('retina-btn-loading');
+  });
+});
+</script>
+{% endblock %}
