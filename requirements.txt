@@ -20,3 +20,11 @@ scikit-learn==1.6.1
 # Plotting / figures
 matplotlib==3.11.0
 seaborn==0.13.2
+
+# Dataset download
+kagglehub==0.3.10
+tqdm==4.67.1
+
+# Development
+pre-commit==4.2.0
+ruff==0.15.0

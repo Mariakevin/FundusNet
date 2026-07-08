@@ -14,13 +14,12 @@ Usage:
     logger.finalize()
 """
 
-import os
 import csv
 import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class TrainingLogger:
@@ -32,7 +31,7 @@ class TrainingLogger:
         - {run_name}_summary.json — final summary with best metrics
     """
 
-    def __init__(self, output_dir: str = "logs", run_name: Optional[str] = None):
+    def __init__(self, output_dir: str = "logs", run_name: str | None = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,8 +40,8 @@ class TrainingLogger:
             run_name = f"run_{timestamp}"
         self.run_name = run_name
 
-        self.config: Dict[str, Any] = {}
-        self.epochs: List[Dict[str, Any]] = []
+        self.config: dict[str, Any] = {}
+        self.epochs: list[dict[str, Any]] = []
         self.start_time = time.time()
         self.best_val_acc = 0.0
         self.best_epoch = -1
@@ -51,11 +50,12 @@ class TrainingLogger:
         self._csv_path = self.output_dir / f"{run_name}_metrics.csv"
         self._summary_path = self.output_dir / f"{run_name}_summary.json"
 
-    def log_config(self, config: Dict[str, Any]) -> None:
+    def log_config(self, config: dict[str, Any]) -> None:
         """Log training configuration / hyperparameters.
 
         Args:
             config: dict of hyperparameters (model, lr, batch_size, epochs, etc.)
+
         """
         self.config = config
         self.config["run_name"] = self.run_name
@@ -69,6 +69,7 @@ class TrainingLogger:
         Args:
             epoch: epoch number (0-indexed)
             **metrics: keyword arguments for metrics (train_loss, val_loss, train_acc, val_acc, lr, etc.)
+
         """
         record = {"epoch": epoch + 1}
         record.update(metrics)
@@ -93,11 +94,12 @@ class TrainingLogger:
                 writer.writeheader()
             writer.writerow(self.epochs[-1])
 
-    def finalize(self) -> Dict[str, Any]:
+    def finalize(self) -> dict[str, Any]:
         """Write final summary and return it.
 
         Returns:
             dict with summary statistics
+
         """
         elapsed = time.time() - self.start_time
 
@@ -132,6 +134,7 @@ class TrainingLogger:
 
         Returns:
             tuple of (train_losses, val_losses, train_accs, val_accs)
+
         """
         train_losses = [e.get("train_loss", 0) for e in self.epochs]
         val_losses = [e.get("val_loss", 0) for e in self.epochs]

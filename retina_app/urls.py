@@ -1,4 +1,5 @@
 from django.urls import path
+
 from .views import index_view, protected_media
 
 urlpatterns = [

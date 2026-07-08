@@ -1,13 +1,11 @@
-"""
-Model manager — loading, singleton, checkpoint handling, health monitoring.
-"""
+"""Model manager — loading, singleton, checkpoint handling, health monitoring."""
 
-import os
-import time
 import logging
+import os
 import threading
+import time
 from collections import deque
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -15,11 +13,10 @@ import torchvision.models as models
 
 from retina_app.constants import (
     CATEGORIES,
-    MODEL_LIST,
-    MODEL_HEALTH_WINDOW,
     MODEL_HEALTH_MIN_ACCURACY,
+    MODEL_HEALTH_WINDOW,
+    MODEL_LIST,
 )
-from retina_app.services.exceptions import ModelLoadError
 
 logger = logging.getLogger("retina_app")
 
@@ -34,12 +31,13 @@ MODEL_VERSIONS = {
     "vit": "vit-b16-retinopathy-v1",
 }
 
-MODEL_PATHS: Optional[Dict[str, str]] = None
+MODEL_PATHS: dict[str, str] | None = None
 
 
-def _get_model_paths() -> Dict[str, str]:
+def _get_model_paths() -> dict[str, str]:
     """Lazy evaluation of model paths to avoid import-time Django configuration issues."""
     from django.conf import settings
+
     models_dir = os.path.join(settings.BASE_DIR, "models")
     return {
         "squeezenet": os.path.join(models_dir, "squeezenet_retinopathy.pth"),
@@ -51,7 +49,9 @@ def _get_model_paths() -> Dict[str, str]:
     }
 
 
-def _load_checkpoint_features(checkpoint: Dict, model: nn.Module) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+def _load_checkpoint_features(
+    checkpoint: dict, model: nn.Module
+) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
     """Load compatible feature layers from checkpoint into model.
 
     Returns (compatible_features, model_state) — model_state is the current
@@ -115,7 +115,7 @@ def _create_improved_classifier(model_type: str, in_features: int, num_classes: 
     return classifier
 
 
-def _load_model_with_checkpoint(model_type: str, model_path: str) -> Tuple[nn.Module, bool, int]:
+def _load_model_with_checkpoint(model_type: str, model_path: str) -> tuple[nn.Module, bool, int]:
     """Load model with checkpoint, returns (model, checkpoint_loaded, in_features)."""
     if model_type == "squeezenet":
         model = models.squeezenet1_0(weights=None)
@@ -151,10 +151,10 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> Tuple[nn.Mo
                 logger.warning("weights_only=True failed for %s, falling back to safe load", model_type)
                 checkpoint = torch.load(model_path, map_location=DEVICE, weights_only=False)
 
-            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-                saved_type = checkpoint.get('model_type', '')
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                saved_type = checkpoint.get("model_type", "")
                 if saved_type == model_type:
-                    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+                    model.load_state_dict(checkpoint["model_state_dict"], strict=False)
                     checkpoint_loaded = True
                     logger.info(f"Loaded full checkpoint for {model_type}")
                 else:
@@ -163,7 +163,9 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> Tuple[nn.Mo
                         model_state.update(compatible_features)
                         model.load_state_dict(model_state, strict=False)
                         checkpoint_loaded = True
-                        logger.info(f"Loaded {len(compatible_features)} compatible layers from checkpoint for {model_type}")
+                        logger.info(
+                            f"Loaded {len(compatible_features)} compatible layers from checkpoint for {model_type}"
+                        )
                     else:
                         logger.warning(f"Too few compatible layers ({len(compatible_features)}) from checkpoint")
             else:
@@ -186,8 +188,8 @@ class ModelManager:
     """Manages multiple ML models for ensemble inference."""
 
     def __init__(self):
-        self._models: Dict[str, nn.Module] = {}
-        self._model_types: Dict[str, str] = {}
+        self._models: dict[str, nn.Module] = {}
+        self._model_types: dict[str, str] = {}
 
     def get_model(self, model_type: str = "efficientnet") -> nn.Module:
         """Load and return a specific model."""
@@ -261,25 +263,27 @@ class ModelHealthTracker:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._predictions: Dict[str, deque] = {}
+        self._predictions: dict[str, deque] = {}
 
     def record_prediction(self, model_type: str, predicted_class: str, confidence: float) -> None:
         """Record a model prediction for health tracking."""
         with self._lock:
             if model_type not in self._predictions:
                 self._predictions[model_type] = deque(maxlen=MODEL_HEALTH_WINDOW)
-            self._predictions[model_type].append({
-                "class": predicted_class,
-                "confidence": confidence,
-                "timestamp": time.time(),
-            })
+            self._predictions[model_type].append(
+                {
+                    "class": predicted_class,
+                    "confidence": confidence,
+                    "timestamp": time.time(),
+                }
+            )
 
-    def record_ensemble_prediction(self, predictions: List[Tuple[str, Dict[str, Any]]]) -> None:
+    def record_ensemble_prediction(self, predictions: list[tuple[str, dict[str, Any]]]) -> None:
         """Record predictions from all models in an ensemble run."""
         for model_type, pred in predictions:
             self.record_prediction(model_type, pred.get("label", ""), pred.get("confidence", 0.0))
 
-    def get_model_health(self, model_type: str) -> Dict[str, Any]:
+    def get_model_health(self, model_type: str) -> dict[str, Any]:
         """Get health status for a specific model."""
         with self._lock:
             if model_type not in self._predictions:
@@ -310,7 +314,7 @@ class ModelHealthTracker:
                 "window_size": MODEL_HEALTH_WINDOW,
             }
 
-    def get_all_health(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_health(self) -> dict[str, dict[str, Any]]:
         """Get health status for all tracked models."""
         with self._lock:
             all_types = set(list(self._predictions.keys()) + MODEL_LIST)
@@ -322,8 +326,8 @@ class ModelHealthTracker:
             self._predictions.clear()
 
 
-_model_manager: Optional[ModelManager] = None
-_health_tracker: Optional[ModelHealthTracker] = None
+_model_manager: ModelManager | None = None
+_health_tracker: ModelHealthTracker | None = None
 _manager_lock = threading.Lock()
 _health_lock = threading.Lock()
 

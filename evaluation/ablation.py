@@ -5,37 +5,37 @@ overall performance. Produces a table showing each component's impact
 on accuracy, F1, and latency.
 """
 
+import json
 import os
 import sys
-import json
 import time
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
-from evaluation.metrics import overall_metrics, per_class_metrics
 from evaluation.evaluate import load_dataset
+from evaluation.metrics import overall_metrics
 from retina_app.constants import (
     CATEGORIES,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    UNCERTAINTY_THRESHOLD,
 )
-from retina_app.services.model_manager import get_model_manager
 from retina_app.services.ensemble import (
     _predict_single_model,
+    detect_model_disagreement,
     ensemble_predictions,
     selective_ensemble,
-    detect_model_disagreement,
 )
+from retina_app.services.model_manager import get_model_manager
 from retina_app.services.uncertainty import mc_dropout_single_model
-
 
 COMPONENTS = [
     {
@@ -66,12 +66,17 @@ COMPONENTS = [
 ]
 
 
-def run_inference_single_config(models, file_paths, labels, model_weights,
-                                  skip_fundus_validation=False,
-                                  skip_quality_check=False,
-                                  skip_selective=False,
-                                  skip_mc_dropout=False,
-                                  skip_tta=False):
+def run_inference_single_config(
+    models,
+    file_paths,
+    labels,
+    model_weights,
+    skip_fundus_validation=False,
+    skip_quality_check=False,
+    skip_selective=False,
+    skip_mc_dropout=False,
+    skip_tta=False,
+):
     """Run inference with specific component configuration.
 
     Args:
@@ -83,6 +88,7 @@ def run_inference_single_config(models, file_paths, labels, model_weights,
 
     Returns:
         dict with predictions, latencies, n_refused, accuracy
+
     """
     preds = []
     latencies = []
@@ -97,7 +103,8 @@ def run_inference_single_config(models, file_paths, labels, model_weights,
             if name in models:
                 try:
                     pred = _predict_single_model(
-                        models[name], path,
+                        models[name],
+                        path,
                         use_tta=not skip_tta,
                     )
                     individual_preds.append(pred)
@@ -125,9 +132,7 @@ def run_inference_single_config(models, file_paths, labels, model_weights,
             try:
                 for name in model_weights:
                     if name in models:
-                        mc_result = mc_dropout_single_model(
-                            models[name], path, n_passes=5
-                        )
+                        mc_result = mc_dropout_single_model(models[name], path, n_passes=5)
                         if mc_result and mc_result.get("is_uncertain", False):
                             n_refused += 1
                             result = {"label": -1, "is_refused": True}
@@ -144,7 +149,7 @@ def run_inference_single_config(models, file_paths, labels, model_weights,
             preds.append(result["label"])
 
     preds = np.array(preds)
-    labels = np.array(labels[:len(preds)])
+    labels = np.array(labels[: len(preds)])
 
     # Filter refused
     valid_mask = preds >= 0
@@ -170,8 +175,7 @@ def run_inference_single_config(models, file_paths, labels, model_weights,
     }
 
 
-def run_ablation_study(dataset_dir, n_folds=5, model_list=None, seed=42,
-                         output_dir=None):
+def run_ablation_study(dataset_dir, n_folds=5, model_list=None, seed=42, output_dir=None):
     """Run full ablation study.
 
     Tests:
@@ -206,33 +210,39 @@ def run_ablation_study(dataset_dir, n_folds=5, model_list=None, seed=42,
     all_configs = []
 
     # Full system (baseline)
-    all_configs.append({
-        "name": "full_system",
-        "description": "All components enabled",
-        "kwargs": {},
-    })
+    all_configs.append(
+        {
+            "name": "full_system",
+            "description": "All components enabled",
+            "kwargs": {},
+        }
+    )
 
     # Ablation: remove each component
     for comp in COMPONENTS:
         kwargs = {comp["disable_kwarg"]: True}
-        all_configs.append({
-            "name": f"no_{comp['name']}",
-            "description": f"Without {comp['description']}",
-            "kwargs": kwargs,
-        })
+        all_configs.append(
+            {
+                "name": f"no_{comp['name']}",
+                "description": f"Without {comp['description']}",
+                "kwargs": kwargs,
+            }
+        )
 
     # All disabled (bare ensemble)
-    all_configs.append({
-        "name": "bare_ensemble",
-        "description": "Equal-weight ensemble, no extras",
-        "kwargs": {
-            "skip_fundus_validation": True,
-            "skip_quality_check": True,
-            "skip_selective": True,
-            "skip_mc_dropout": True,
-            "skip_tta": True,
-        },
-    })
+    all_configs.append(
+        {
+            "name": "bare_ensemble",
+            "description": "Equal-weight ensemble, no extras",
+            "kwargs": {
+                "skip_fundus_validation": True,
+                "skip_quality_check": True,
+                "skip_selective": True,
+                "skip_mc_dropout": True,
+                "skip_tta": True,
+            },
+        }
+    )
 
     fold_results = []
 
@@ -244,13 +254,18 @@ def run_ablation_study(dataset_dir, n_folds=5, model_list=None, seed=42,
         config_results = {}
         for config in all_configs:
             result = run_inference_single_config(
-                models, val_paths, val_labels, model_weights,
+                models,
+                val_paths,
+                val_labels,
+                model_weights,
                 **config["kwargs"],
             )
             config_results[config["name"]] = result
-            print(f"  {config['name']}: acc={result['accuracy']:.4f}, "
-                  f"f1={result['macro_f1']:.4f}, "
-                  f"latency={result['mean_latency_ms']:.1f}ms")
+            print(
+                f"  {config['name']}: acc={result['accuracy']:.4f}, "
+                f"f1={result['macro_f1']:.4f}, "
+                f"latency={result['mean_latency_ms']:.1f}ms"
+            )
 
         fold_results.append(config_results)
         fold_idx += 1
@@ -279,15 +294,9 @@ def run_ablation_study(dataset_dir, n_folds=5, model_list=None, seed=42,
 
     for name in summary:
         if name != "full_system":
-            summary[name]["accuracy_delta"] = round(
-                summary[name]["accuracy"]["mean"] - full_acc, 4
-            )
-            summary[name]["f1_delta"] = round(
-                summary[name]["macro_f1"]["mean"] - full_f1, 4
-            )
-            summary[name]["latency_delta_ms"] = round(
-                summary[name]["mean_latency_ms"]["mean"] - full_lat, 2
-            )
+            summary[name]["accuracy_delta"] = round(summary[name]["accuracy"]["mean"] - full_acc, 4)
+            summary[name]["f1_delta"] = round(summary[name]["macro_f1"]["mean"] - full_f1, 4)
+            summary[name]["latency_delta_ms"] = round(summary[name]["mean_latency_ms"]["mean"] - full_lat, 2)
 
     results = {"per_fold": fold_results, "summary": summary}
 
@@ -319,12 +328,14 @@ def print_ablation_summary(results):
         delta_acc_str = f"{delta_acc:+.4f}" if isinstance(delta_acc, (int, float)) else str(delta_acc)
         delta_f1_str = f"{delta_f1:+.4f}" if isinstance(delta_f1, (int, float)) else str(delta_f1)
 
-        print(f"{name:<25} "
-              f"{acc['mean']:.4f}±{acc['std']:.4f} "
-              f"{delta_acc_str:>10} "
-              f"{f1['mean']:.4f}±{f1['std']:.4f} "
-              f"{delta_f1_str:>10} "
-              f"{lat['mean']:.1f}±{lat['std']:.1f}ms")
+        print(
+            f"{name:<25} "
+            f"{acc['mean']:.4f}±{acc['std']:.4f} "
+            f"{delta_acc_str:>10} "
+            f"{f1['mean']:.4f}±{f1['std']:.4f} "
+            f"{delta_f1_str:>10} "
+            f"{lat['mean']:.1f}±{lat['std']:.1f}ms"
+        )
 
     print("\n" + "=" * 100)
     print("Negative Δ = component helps performance")
@@ -333,6 +344,7 @@ def print_ablation_summary(results):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="retina_dataset")
     parser.add_argument("--folds", type=int, default=5)

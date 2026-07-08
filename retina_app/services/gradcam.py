@@ -1,5 +1,4 @@
-"""
-Grad-CAM Explainability.
+"""Grad-CAM Explainability.
 
 Generate heatmaps showing which regions of the retinal image
 drove the classification decision. Based on Selvaraju et al. (ICCV 2017).
@@ -7,7 +6,7 @@ drove the classification decision. Based on Selvaraju et al. (ICCV 2017).
 
 import logging
 import os
-from typing import Dict, Any, Optional, Tuple
+from typing import Any
 
 import cv2
 import numpy as np
@@ -35,8 +34,6 @@ GRADCAM_TARGET_LAYERS = {
 
 def _get_target_layer(model: nn.Module, model_type: str) -> nn.Module:
     """Get the target layer for Grad-CAM based on model architecture."""
-    target_name = GRADCAM_TARGET_LAYERS.get(model_type, "features")
-
     if model_type == "resnet":
         return model.layer4
     elif model_type == "efficientnet":
@@ -85,8 +82,8 @@ class GradCAM:
     def generate(
         self,
         input_tensor: torch.Tensor,
-        target_class: Optional[int] = None,
-    ) -> Tuple[np.ndarray, int, float]:
+        target_class: int | None = None,
+    ) -> tuple[np.ndarray, int, float]:
         """Generate Grad-CAM heatmap.
 
         Args:
@@ -96,6 +93,7 @@ class GradCAM:
         Returns:
             Tuple of (heatmap as numpy array [H, W] with values in [0, 1],
                       predicted class index, confidence score)
+
         """
         from retina_app.services.model_manager import DEVICE
 
@@ -155,7 +153,7 @@ class GradCAM:
 
 def _deprocess_image(
     cam: np.ndarray,
-    original_size: Tuple[int, int],
+    original_size: tuple[int, int],
 ) -> np.ndarray:
     """Resize heatmap to original image size and apply colormap."""
     cam_resized = cv2.resize(cam, original_size, interpolation=cv2.INTER_LINEAR)
@@ -187,9 +185,9 @@ def generate_gradcam(
     model: nn.Module,
     image_path: str,
     model_type: str,
-    predicted_class: Optional[int] = None,
-    output_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    predicted_class: int | None = None,
+    output_path: str | None = None,
+) -> dict[str, Any]:
     """Generate Grad-CAM heatmap for a model's prediction.
 
     Args:
@@ -201,9 +199,8 @@ def generate_gradcam(
 
     Returns:
         Dict with gradcam_url, predicted_class, confidence, etc.
-    """
-    from retina_app.services.model_manager import DEVICE
 
+    """
     # Load and preprocess image
     with Image.open(image_path) as img:
         rgb_img = img.convert("RGB")

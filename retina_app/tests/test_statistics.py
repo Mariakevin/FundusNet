@@ -1,21 +1,21 @@
 """Tests for statistics.py — statistical testing utilities."""
 
-from django.test import SimpleTestCase
 import numpy as np
+from django.test import SimpleTestCase
+
 from evaluation.statistics import (
-    mcnemar_test,
-    paired_t_test,
+    bonferroni_correction,
     bootstrap_confidence_interval,
     compute_cohens_d,
     delong_auc_test,
-    bonferroni_correction,
     holm_correction,
+    mcnemar_test,
+    paired_t_test,
     significance_summary_table,
 )
 
 
 class McNemarTestTest(SimpleTestCase):
-
     def test_identical_classifiers(self):
         labels = np.array([0, 1, 2, 0, 1, 2, 0, 1])
         preds = np.array([0, 1, 2, 0, 1, 2, 0, 1])
@@ -53,7 +53,6 @@ class McNemarTestTest(SimpleTestCase):
 
 
 class PairedTTestTest(SimpleTestCase):
-
     def test_identical_scores(self):
         scores_a = [0.85, 0.90, 0.88, 0.92, 0.87]
         scores_b = [0.85, 0.90, 0.88, 0.92, 0.87]
@@ -82,7 +81,6 @@ class PairedTTestTest(SimpleTestCase):
 
 
 class BootstrapCITest(SimpleTestCase):
-
     def test_mean_ci(self):
         rng = np.random.RandomState(42)
         values = rng.normal(0.5, 0.1, 100)
@@ -99,9 +97,7 @@ class BootstrapCITest(SimpleTestCase):
 
     def test_custom_statistic(self):
         values = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        result = bootstrap_confidence_interval(
-            values, statistic_fn=np.median, seed=42
-        )
+        result = bootstrap_confidence_interval(values, statistic_fn=np.median, seed=42)
         self.assertEqual(result["point_estimate"], 5.5)
 
     def test_se_positive(self):
@@ -111,7 +107,6 @@ class BootstrapCITest(SimpleTestCase):
 
 
 class CohensDTest(SimpleTestCase):
-
     def test_identical_distributions(self):
         scores = [0.85, 0.90, 0.88, 0.92, 0.87]
         result = compute_cohens_d(scores, scores)
@@ -133,7 +128,6 @@ class CohensDTest(SimpleTestCase):
 
 
 class DeLongAUCTest(SimpleTestCase):
-
     def test_perfect_vs_random(self):
         n = 100
         labels = np.array([0] * 50 + [1] * 50)
@@ -160,7 +154,6 @@ class DeLongAUCTest(SimpleTestCase):
 
 
 class BonferroniCorrectionTest(SimpleTestCase):
-
     def test_single_test(self):
         result = bonferroni_correction([0.03])
         self.assertAlmostEqual(result[0], 0.03)
@@ -178,7 +171,6 @@ class BonferroniCorrectionTest(SimpleTestCase):
 
 
 class HolmCorrectionTest(SimpleTestCase):
-
     def test_single_test(self):
         result = holm_correction([0.03])
         self.assertAlmostEqual(result[0], 0.03)
@@ -204,7 +196,6 @@ class HolmCorrectionTest(SimpleTestCase):
 
 
 class SignificanceSummaryTableTest(SimpleTestCase):
-
     def test_basic_table(self):
         comparisons = [
             {"name_a": "A", "name_b": "B", "p_value": 0.01, "metric": "accuracy"},

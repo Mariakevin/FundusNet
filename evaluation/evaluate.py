@@ -7,20 +7,22 @@ Usage:
     python -m retina_app.evaluation.evaluate [--models MODEL1,MODEL2] [--folds N]
 """
 
+import argparse
+import json
 import os
 import sys
-import json
 import time
-import argparse
-import numpy as np
 from pathlib import Path
-from collections import defaultdict
-from sklearn.model_selection import StratifiedKFold
+
+import numpy as np
 from sklearn.metrics import (
-    matthews_corrcoef,
     cohen_kappa_score,
+    matthews_corrcoef,
+)
+from sklearn.metrics import (
     confusion_matrix as sk_confusion_matrix,
 )
+from sklearn.model_selection import StratifiedKFold
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,42 +30,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
 from evaluation.metrics import (
+    compute_auroc_per_class,
+    compute_brier,
     compute_ece,
     compute_mce,
-    compute_brier,
-    per_class_metrics,
     confusion_matrix,
     overall_metrics,
-    compute_auroc_per_class,
-    compute_reliability_data,
-    compute_error_detection_auroc,
+    per_class_metrics,
 )
 from evaluation.statistics import bootstrap_confidence_interval
 from retina_app.constants import (
     CATEGORIES,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    CLASS_PERFORMANCE_WEIGHTS,
-    MC_DROPOUT_PASSES,
-    ENABLE_MC_DROPOUT,
     UNCERTAINTY_THRESHOLD,
 )
-from retina_app.services.model_manager import get_model_manager
 from retina_app.services.ensemble import (
-    ensemble_predictions,
-    selective_ensemble,
-    detect_model_disagreement,
-    apply_temperature_scaling,
     _predict_single_model,
-    predict_models_parallel,
+    detect_model_disagreement,
+    selective_ensemble,
 )
+from retina_app.services.model_manager import get_model_manager
 from retina_app.services.uncertainty import (
-    mc_dropout_single_model,
-    mc_dropout_ensemble,
-    compute_entropy,
     compute_prediction_entropy,
 )
 
@@ -75,6 +67,7 @@ def load_dataset(dataset_dir):
         file_paths: list of str (absolute paths)
         labels: list of int (class indices)
         class_names: list of str
+
     """
     file_paths = []
     labels = []
@@ -104,21 +97,20 @@ def evaluate_single_model(models, image_path, model_name, use_tta=False):
         return None
 
 
-def evaluate_ensemble(models, image_path, model_weights=None, use_tta=False,
-                       use_selective=True, use_mc_dropout=False):
+def evaluate_ensemble(models, image_path, model_weights=None, use_tta=False, use_selective=True, use_mc_dropout=False):
     """Run ensemble evaluation on a single image.
 
     Returns:
         dict with label, confidence, probabilities, uncertainty, agreement info
+
     """
     active_models = {k: v for k, v in models.items() if k in model_weights}
     if not active_models:
         return None
 
-    model_names = list(active_models.keys())
     individual_preds = {}
 
-    for name in model_names:
+    for name in active_models:
         try:
             pred = _predict_single_model(active_models[name], image_path, use_tta=use_tta)
             individual_preds[name] = pred
@@ -142,16 +134,16 @@ def evaluate_ensemble(models, image_path, model_weights=None, use_tta=False,
                 "uncertainty": result.get("uncertainty", 0.0),
                 "is_uncertain": result.get("uncertainty", 0.0) > UNCERTAINTY_THRESHOLD,
                 "agreement_level": agreement_info["agreement_level"],
-                "n_models_used": result.get("filtered_n_models", len(pred_list)),
+                "n_models_used": result.get("filtered_n_models", len(pred_items)),
             }
 
     probs = np.zeros(len(CATEGORIES))
     weights_used = []
-    for name, pred in zip(model_names, pred_list):
-        if name in model_weights:
-            w = model_weights[name]
+    for pred_name, pred in pred_items:
+        if pred_name in model_weights:
+            w = model_weights[pred_name]
             probs += w * np.array(pred["probabilities"])
-            weights_used.append(name)
+            weights_used.append(pred_name)
 
     probs = probs / max(probs.sum(), 1e-8)
     label = int(np.argmax(probs))
@@ -172,12 +164,12 @@ def evaluate_ensemble(models, image_path, model_weights=None, use_tta=False,
     }
 
 
-def run_cv_evaluation(dataset_dir, n_folds=5, model_list=None, use_tta=False,
-                       seed=42, output_dir=None):
+def run_cv_evaluation(dataset_dir, n_folds=5, model_list=None, use_tta=False, seed=42, output_dir=None):
     """Run full 5-fold stratified CV evaluation.
 
     Returns:
         dict with per-fold results and aggregated statistics
+
     """
     file_paths, labels, class_names = load_dataset(dataset_dir)
     n_samples = len(file_paths)
@@ -215,7 +207,7 @@ def run_cv_evaluation(dataset_dir, n_folds=5, model_list=None, use_tta=False,
     fold_results = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(skf.split(file_paths, labels)):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Fold {fold_idx + 1}/{n_folds}")
         print(f"  Train: {len(train_idx)} samples, Val: {len(val_idx)} samples")
 
@@ -229,8 +221,11 @@ def run_cv_evaluation(dataset_dir, n_folds=5, model_list=None, use_tta=False,
         for path in val_paths:
             t0 = time.time()
             result = evaluate_ensemble(
-                models, path, model_weights=model_weights,
-                use_tta=use_tta, use_selective=True,
+                models,
+                path,
+                model_weights=model_weights,
+                use_tta=use_tta,
+                use_selective=True,
             )
             elapsed = time.time() - t0
             latencies.append(elapsed)
@@ -305,9 +300,7 @@ def aggregate_fold_results(fold_results, n_classes, class_names):
         mean_val = float(np.mean(values))
         std_val = float(np.std(values))
         # Bootstrap 95% CI
-        ci_result = bootstrap_confidence_interval(
-            np.array(values), ci_level=0.95, n_bootstrap=1000, seed=42
-        )
+        ci_result = bootstrap_confidence_interval(np.array(values), ci_level=0.95, n_bootstrap=1000, seed=42)
         aggregated["summary"][key] = {
             "mean": mean_val,
             "std": std_val,
@@ -367,13 +360,17 @@ def print_summary(aggregated):
     print("\nCalibration Metrics:")
     for key in ["ece", "mce", "brier"]:
         val = s[key]
-        print(f"  {key.upper()}: {val['mean']:.4f} ± {val['std']:.4f} [95% CI: {val['ci_95'][0]:.4f}, {val['ci_95'][1]:.4f}]")
+        print(
+            f"  {key.upper()}: {val['mean']:.4f} ± {val['std']:.4f} [95% CI: {val['ci_95'][0]:.4f}, {val['ci_95'][1]:.4f}]"
+        )
 
     print("\nClassification Quality:")
     for key in ["mcc", "kappa", "macro_specificity"]:
         val = s[key]
         display_key = {"mcc": "MCC", "kappa": "Cohen's Kappa", "macro_specificity": "Macro Specificity"}[key]
-        print(f"  {display_key}: {val['mean']:.4f} ± {val['std']:.4f} [95% CI: {val['ci_95'][0]:.4f}, {val['ci_95'][1]:.4f}]")
+        print(
+            f"  {display_key}: {val['mean']:.4f} ± {val['std']:.4f} [95% CI: {val['ci_95'][0]:.4f}, {val['ci_95'][1]:.4f}]"
+        )
 
     print("\nPer-Class F1:")
     for cat, metrics in s["per_class"].items():
@@ -388,16 +385,11 @@ def print_summary(aggregated):
 
 def main():
     parser = argparse.ArgumentParser(description="RetinaAI Evaluation")
-    parser.add_argument("--dataset", default="retina_dataset",
-                        help="Path to dataset directory")
-    parser.add_argument("--models", default=None,
-                        help="Comma-separated model names")
-    parser.add_argument("--folds", type=int, default=5,
-                        help="Number of CV folds")
-    parser.add_argument("--tta", action="store_true",
-                        help="Use test-time augmentation")
-    parser.add_argument("--output", default="evaluation_results",
-                        help="Output directory for results")
+    parser.add_argument("--dataset", default="retina_dataset", help="Path to dataset directory")
+    parser.add_argument("--models", default=None, help="Comma-separated model names")
+    parser.add_argument("--folds", type=int, default=5, help="Number of CV folds")
+    parser.add_argument("--tta", action="store_true", help="Use test-time augmentation")
+    parser.add_argument("--output", default="evaluation_results", help="Output directory for results")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 

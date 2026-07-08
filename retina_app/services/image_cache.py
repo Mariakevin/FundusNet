@@ -1,17 +1,15 @@
-"""
-In-memory image cache with LRU eviction.
-"""
+"""In-memory image cache with LRU eviction."""
 
 import hashlib
+import logging
 import sys
 import threading
-import logging
-from typing import Dict, Any, Optional
 from collections import OrderedDict
+from typing import Any
 
 import numpy as np
 
-from retina_app.constants import MAX_CACHE_SIZE, MAX_CACHE_MEMORY_MB
+from retina_app.constants import MAX_CACHE_MEMORY_MB, MAX_CACHE_SIZE
 
 logger = logging.getLogger("retina_app")
 
@@ -23,13 +21,13 @@ _cache_memory_bytes: int = 0
 def _get_image_hash(image_path: str) -> str:
     """Compute MD5 hash of image file using 64KB chunks (avoids loading entire file)."""
     h = hashlib.md5()
-    with open(image_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
+    with open(image_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()[:16]
 
 
-def get_cache_entry(cache_key: str) -> Optional[Dict[str, Any]]:
+def get_cache_entry(cache_key: str) -> dict[str, Any] | None:
     """Retrieve an item from cache. Returns None on miss."""
     with _cache_lock:
         if cache_key in IMAGE_CACHE:
@@ -37,7 +35,7 @@ def get_cache_entry(cache_key: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def set_cache_entry(cache_key: str, result: Dict[str, Any]) -> None:
+def set_cache_entry(cache_key: str, result: dict[str, Any]) -> None:
     """Store a result in cache with LRU eviction and incremental memory tracking."""
     global _cache_memory_bytes
     with _cache_lock:
@@ -62,16 +60,16 @@ def _estimate_size(obj: Any) -> int:
     elif isinstance(obj, (list, tuple)):
         return sys.getsizeof(obj) + sum(_estimate_size(item) for item in obj)
     elif isinstance(obj, str):
-        return sys.getsizeof(obj) + len(obj.encode('utf-8'))
+        return sys.getsizeof(obj) + len(obj.encode("utf-8"))
     elif isinstance(obj, (int, float, bool)):
         return sys.getsizeof(obj)
-    elif hasattr(obj, 'nbytes'):
+    elif hasattr(obj, "nbytes"):
         return obj.nbytes
     else:
         return sys.getsizeof(obj)
 
 
-def clear_image_cache() -> Dict[str, int]:
+def clear_image_cache() -> dict[str, int]:
     """Clear the image cache and return the number of items cleared."""
     global _cache_memory_bytes
     with _cache_lock:
@@ -82,7 +80,7 @@ def clear_image_cache() -> Dict[str, int]:
         return {"cleared_items": count, "cache_size": count}
 
 
-def get_cache_stats() -> Dict[str, Any]:
+def get_cache_stats() -> dict[str, Any]:
     """Get cache statistics."""
     with _cache_lock:
         return {

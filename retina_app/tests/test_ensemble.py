@@ -1,16 +1,11 @@
-from unittest.mock import MagicMock, patch
-
-import numpy as np
 import torch
-
 from django.test import TestCase
 
-from retina_app.constants import CATEGORIES, MODEL_WEIGHTS
-from retina_app.services.exceptions import InferenceError
+from retina_app.constants import CATEGORIES
 from retina_app.services.ensemble import (
     apply_temperature_scaling,
-    ensemble_predictions,
     detect_model_disagreement,
+    ensemble_predictions,
     selective_ensemble,
 )
 
@@ -36,27 +31,38 @@ class EnsemblePredictionsTest(TestCase):
             ensemble_predictions([])
 
     def test_single_prediction_passes_through(self):
-        preds = [("squeezenet", {
-            "label": "Healthy",
-            "confidence": 0.9,
-            "probabilities": [0.9, 0.05, 0.03, 0.02],
-        })]
+        preds = [
+            (
+                "squeezenet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.9,
+                    "probabilities": [0.9, 0.05, 0.03, 0.02],
+                },
+            )
+        ]
         result = ensemble_predictions(preds)
         self.assertEqual(result["label"], "Healthy")
         self.assertEqual(result["n_models"], 1)
 
     def test_two_models_majority_vote(self):
         preds = [
-            ("squeezenet", {
-                "label": "Healthy",
-                "confidence": 0.8,
-                "probabilities": [0.8, 0.1, 0.05, 0.05],
-            }),
-            ("efficientnet", {
-                "label": "Healthy",
-                "confidence": 0.7,
-                "probabilities": [0.7, 0.15, 0.1, 0.05],
-            }),
+            (
+                "squeezenet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.8,
+                    "probabilities": [0.8, 0.1, 0.05, 0.05],
+                },
+            ),
+            (
+                "efficientnet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.7,
+                    "probabilities": [0.7, 0.15, 0.1, 0.05],
+                },
+            ),
         ]
         result = ensemble_predictions(preds)
         self.assertEqual(result["label"], "Healthy")
@@ -65,16 +71,22 @@ class EnsemblePredictionsTest(TestCase):
 
     def test_ensemble_returns_all_keys(self):
         preds = [
-            ("squeezenet", {
-                "label": "Cataract",
-                "confidence": 0.6,
-                "probabilities": [0.1, 0.6, 0.2, 0.1],
-            }),
-            ("resnet", {
-                "label": "Glaucoma",
-                "confidence": 0.55,
-                "probabilities": [0.1, 0.2, 0.55, 0.15],
-            }),
+            (
+                "squeezenet",
+                {
+                    "label": "Cataract",
+                    "confidence": 0.6,
+                    "probabilities": [0.1, 0.6, 0.2, 0.1],
+                },
+            ),
+            (
+                "resnet",
+                {
+                    "label": "Glaucoma",
+                    "confidence": 0.55,
+                    "probabilities": [0.1, 0.2, 0.55, 0.15],
+                },
+            ),
         ]
         result = ensemble_predictions(preds)
         self.assertIn("label", result)
@@ -86,16 +98,22 @@ class EnsemblePredictionsTest(TestCase):
 
     def test_ensemble_probabilities_sum_to_one(self):
         preds = [
-            ("squeezenet", {
-                "label": "Healthy",
-                "confidence": 0.8,
-                "probabilities": [0.8, 0.1, 0.05, 0.05],
-            }),
-            ("efficientnet", {
-                "label": "Cataract",
-                "confidence": 0.6,
-                "probabilities": [0.2, 0.5, 0.2, 0.1],
-            }),
+            (
+                "squeezenet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.8,
+                    "probabilities": [0.8, 0.1, 0.05, 0.05],
+                },
+            ),
+            (
+                "efficientnet",
+                {
+                    "label": "Cataract",
+                    "confidence": 0.6,
+                    "probabilities": [0.2, 0.5, 0.2, 0.1],
+                },
+            ),
         ]
         result = ensemble_predictions(preds)
         total = sum(result["probabilities"])
@@ -103,16 +121,22 @@ class EnsemblePredictionsTest(TestCase):
 
     def test_ensemble_uncertainty_range(self):
         preds = [
-            ("squeezenet", {
-                "label": "Healthy",
-                "confidence": 0.8,
-                "probabilities": [0.8, 0.1, 0.05, 0.05],
-            }),
-            ("efficientnet", {
-                "label": "Healthy",
-                "confidence": 0.7,
-                "probabilities": [0.7, 0.15, 0.1, 0.05],
-            }),
+            (
+                "squeezenet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.8,
+                    "probabilities": [0.8, 0.1, 0.05, 0.05],
+                },
+            ),
+            (
+                "efficientnet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.7,
+                    "probabilities": [0.7, 0.15, 0.1, 0.05],
+                },
+            ),
         ]
         result = ensemble_predictions(preds)
         self.assertGreaterEqual(result["uncertainty"], 0.0)
@@ -120,16 +144,22 @@ class EnsemblePredictionsTest(TestCase):
 
     def test_ensemble_with_unknown_category_graceful(self):
         preds = [
-            ("squeezenet", {
-                "label": "Unknown",
-                "confidence": 0.5,
-                "probabilities": [0.25, 0.25, 0.25, 0.25],
-            }),
-            ("efficientnet", {
-                "label": "Healthy",
-                "confidence": 0.8,
-                "probabilities": [0.8, 0.1, 0.05, 0.05],
-            }),
+            (
+                "squeezenet",
+                {
+                    "label": "Unknown",
+                    "confidence": 0.5,
+                    "probabilities": [0.25, 0.25, 0.25, 0.25],
+                },
+            ),
+            (
+                "efficientnet",
+                {
+                    "label": "Healthy",
+                    "confidence": 0.8,
+                    "probabilities": [0.8, 0.1, 0.05, 0.05],
+                },
+            ),
         ]
         result = ensemble_predictions(preds)
         self.assertIn(result["label"], CATEGORIES)

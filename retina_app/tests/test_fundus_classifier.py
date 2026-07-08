@@ -2,8 +2,8 @@
 
 import os
 import tempfile
+
 import numpy as np
-from unittest.mock import patch, MagicMock
 from django.test import SimpleTestCase
 
 from retina_app.services.fundus_classifier import FundusClassifier
@@ -30,6 +30,7 @@ class TestFundusClassifierForward(SimpleTestCase):
 
     def test_forward_shape(self):
         import torch
+
         model = FundusClassifier(num_classes=2, freeze_backbone=True)
         x = torch.randn(1, 3, 224, 224)
         output = model(x)
@@ -37,6 +38,7 @@ class TestFundusClassifierForward(SimpleTestCase):
 
     def test_batch_forward(self):
         import torch
+
         model = FundusClassifier(num_classes=2, freeze_backbone=True)
         x = torch.randn(4, 3, 224, 224)
         output = model(x)
@@ -48,6 +50,7 @@ class TestFundusClassifierPredict(SimpleTestCase):
 
     def test_predict_returns_expected_keys(self):
         import torch
+
         model = FundusClassifier(num_classes=2, freeze_backbone=True)
         model.eval()
         tensor = torch.randn(1, 3, 224, 224)
@@ -58,6 +61,7 @@ class TestFundusClassifierPredict(SimpleTestCase):
 
     def test_predict_single_image(self):
         import torch
+
         model = FundusClassifier(num_classes=2, freeze_backbone=True)
         model.eval()
         tensor = torch.randn(3, 224, 224)  # no batch dim
@@ -67,6 +71,7 @@ class TestFundusClassifierPredict(SimpleTestCase):
 
     def test_predict_from_pil(self):
         from PIL import Image
+
         model = FundusClassifier(num_classes=2, freeze_backbone=True)
         model.eval()
         img = Image.fromarray(np.random.randint(0, 255, (224, 224, 3), dtype=np.uint8))
@@ -82,6 +87,7 @@ class TestFundusClassifierSaveLoad(SimpleTestCase):
 
     def test_save_and_load(self):
         import torch
+
         with tempfile.TemporaryDirectory() as tmpdir:
             model = FundusClassifier(num_classes=2, freeze_backbone=True)
             save_path = os.path.join(tmpdir, "test_model.pth")
@@ -98,12 +104,9 @@ class TestFundusClassifierSaveLoad(SimpleTestCase):
             with torch.no_grad():
                 out1 = model(tensor)
                 out2 = loaded(tensor)
-            np.testing.assert_array_almost_equal(
-                out1.numpy(), out2.numpy(), decimal=5
-            )
+            np.testing.assert_array_almost_equal(out1.numpy(), out2.numpy(), decimal=5)
 
     def test_load_with_eval_mode(self):
-        import torch
         with tempfile.TemporaryDirectory() as tmpdir:
             model = FundusClassifier(num_classes=2, freeze_backbone=True)
             save_path = os.path.join(tmpdir, "test_model.pth")
@@ -120,10 +123,11 @@ class TestFundusClassifierConstants(SimpleTestCase):
 
     def test_constants_exist(self):
         from retina_app.constants import (
-            FUNDUS_LEARNED_VALIDATOR_ENABLED,
             FUNDUS_LEARNED_MODEL_PATH,
             FUNDUS_LEARNED_THRESHOLD,
+            FUNDUS_LEARNED_VALIDATOR_ENABLED,
         )
+
         self.assertIsInstance(FUNDUS_LEARNED_VALIDATOR_ENABLED, bool)
         self.assertIsInstance(FUNDUS_LEARNED_MODEL_PATH, str)
         self.assertIsInstance(FUNDUS_LEARNED_THRESHOLD, float)

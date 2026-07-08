@@ -1,5 +1,4 @@
-"""
-Retinal fundus image validation using multi-signal heuristic analysis.
+"""Retinal fundus image validation using multi-signal heuristic analysis.
 
 Rejects non-fundus images (text, screenshots, natural scenes) before inference.
 Uses 4 independent computer vision signals — no extra trained model needed.
@@ -12,23 +11,22 @@ Signals:
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
 
 import cv2
 import numpy as np
 
 from retina_app.constants import (
-    FUNDUS_VALIDATION_THRESHOLD,
-    FUNDUS_COLOR_MIN_RATIO,
-    FUNDUS_CIRCULARITY_MIN,
-    FUNDUS_AREA_MIN_RATIO,
     FUNDUS_AREA_MAX_RATIO,
-    FUNDUS_EDGE_MIN_RATIO,
+    FUNDUS_AREA_MIN_RATIO,
+    FUNDUS_CIRCULARITY_MIN,
+    FUNDUS_COLOR_MIN_RATIO,
     FUNDUS_EDGE_MAX_RATIO,
+    FUNDUS_EDGE_MIN_RATIO,
     FUNDUS_GREEN_CH_MIN_STD,
-    FUNDUS_LEARNED_VALIDATOR_ENABLED,
     FUNDUS_LEARNED_MODEL_PATH,
-    FUNDUS_LEARNED_THRESHOLD,
+    FUNDUS_LEARNED_VALIDATOR_ENABLED,
+    FUNDUS_VALIDATION_THRESHOLD,
 )
 
 logger = logging.getLogger("retina_app")
@@ -115,10 +113,10 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
     # Check border ring (outer 8% of image) for darkness
     border_width = max(int(min(h, w) * 0.08), 5)
     border_mask = np.zeros((h, w), dtype=np.uint8)
-    border_mask[:border_width, :] = 255      # top
-    border_mask[-border_width:, :] = 255     # bottom
-    border_mask[:, :border_width] = 255      # left
-    border_mask[:, -border_width:] = 255     # right
+    border_mask[:border_width, :] = 255  # top
+    border_mask[-border_width:, :] = 255  # bottom
+    border_mask[:, :border_width] = 255  # left
+    border_mask[:, -border_width:] = 255  # right
 
     # Pixels that are in border AND outside the bright region
     dark_border = cv2.bitwise_and(border_mask, cv2.bitwise_not(mask))
@@ -245,14 +243,14 @@ def _check_texture_regularity(image: np.ndarray, gray: np.ndarray = None) -> flo
     kernel_size = max(3, h // 50)
     if kernel_size % 2 == 0:
         kernel_size += 1
-    smoothed = np.convolve(h_proj, np.ones(kernel_size) / kernel_size, mode='same')
+    smoothed = np.convolve(h_proj, np.ones(kernel_size) / kernel_size, mode="same")
 
     # Count peaks (local maxima above threshold)
     peak_count = 0
     threshold = 0.15
     in_peak = False
     for i in range(1, len(smoothed) - 1):
-        if smoothed[i] > threshold and smoothed[i] > smoothed[i-1] and smoothed[i] >= smoothed[i+1]:
+        if smoothed[i] > threshold and smoothed[i] > smoothed[i - 1] and smoothed[i] >= smoothed[i + 1]:
             if not in_peak:
                 peak_count += 1
                 in_peak = True
@@ -275,7 +273,7 @@ def _check_texture_regularity(image: np.ndarray, gray: np.ndarray = None) -> flo
         return 0.5
 
 
-def validate_fundus_image(image_path: str) -> Dict[str, Any]:
+def validate_fundus_image(image_path: str) -> dict[str, Any]:
     """Validate whether an image is a retinal fundus photograph.
 
     Uses 4 independent heuristic signals to determine if an image is
@@ -290,6 +288,7 @@ def validate_fundus_image(image_path: str) -> Dict[str, Any]:
             confidence (float): Combined confidence score 0.0-1.0
             signals (dict): Individual signal scores
             message (str): Human-readable result message
+
     """
     # Read image with OpenCV
     image = cv2.imread(image_path)
@@ -327,11 +326,7 @@ def validate_fundus_image(image_path: str) -> Dict[str, Any]:
     # texture_regularity gets high weight because it's the strongest
     # discriminator between text/documents and fundus images.
     combined_score = (
-        color_score * 0.25
-        + circular_score * 0.20
-        + edge_score * 0.15
-        + green_score * 0.10
-        + texture_score * 0.30
+        color_score * 0.25 + circular_score * 0.20 + edge_score * 0.15 + green_score * 0.10 + texture_score * 0.30
     )
 
     # Second gate: require color signal to be decent.
@@ -375,7 +370,9 @@ def validate_fundus_image(image_path: str) -> Dict[str, Any]:
 
     logger.debug(
         "Fundus validation: score=%.3f, is_fundus=%s, signals=%s",
-        combined_score, is_fundus, signals,
+        combined_score,
+        is_fundus,
+        signals,
     )
 
     result = {
@@ -388,8 +385,9 @@ def validate_fundus_image(image_path: str) -> Dict[str, Any]:
     # Optional: learned classifier as second gate
     if FUNDUS_LEARNED_VALIDATOR_ENABLED and is_fundus:
         try:
-            from retina_app.services.fundus_classifier import FundusClassifier
             import os
+
+            from retina_app.services.fundus_classifier import FundusClassifier
 
             model_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -398,6 +396,7 @@ def validate_fundus_image(image_path: str) -> Dict[str, Any]:
             if os.path.exists(model_path):
                 classifier = FundusClassifier.load(model_path)
                 from PIL import Image as PILImage
+
                 pil_img = PILImage.open(image_path).convert("RGB")
                 learned_result = classifier.predict_from_pil(pil_img)
 

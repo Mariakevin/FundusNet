@@ -1,5 +1,4 @@
-"""
-MC Dropout Uncertainty Quantification.
+"""MC Dropout Uncertainty Quantification.
 
 Run T stochastic forward passes with dropout enabled at inference time.
 Compute variance/entropy across predictions to estimate model uncertainty.
@@ -7,7 +6,7 @@ Based on Gal & Ghahramani (ICML 2016).
 """
 
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 import numpy as np
 import torch
@@ -16,18 +15,19 @@ import torch.nn.functional as F
 
 from retina_app.constants import (
     CATEGORIES,
+    ENABLE_MC_DROPOUT,
     MC_DROPOUT_PASSES,
     UNCERTAINTY_THRESHOLD,
-    ENABLE_MC_DROPOUT,
 )
 from retina_app.services.transforms import TRANSFORM
 
 logger = logging.getLogger("retina_app")
 
 
-def _enable_dropout(model: nn.Module) -> List[nn.Module]:
+def _enable_dropout(model: nn.Module) -> list[nn.Module]:
     """Set all dropout layers to train mode while keeping batchnorm in eval mode.
-    Returns list of dropout modules that were modified."""
+    Returns list of dropout modules that were modified.
+    """
     dropout_layers = []
     for module in model.modules():
         if isinstance(module, nn.Dropout):
@@ -36,7 +36,7 @@ def _enable_dropout(model: nn.Module) -> List[nn.Module]:
     return dropout_layers
 
 
-def _disable_dropout(dropout_layers: List[nn.Module]) -> None:
+def _disable_dropout(dropout_layers: list[nn.Module]) -> None:
     """Restore all dropout layers to eval mode."""
     for module in dropout_layers:
         module.eval()
@@ -44,7 +44,8 @@ def _disable_dropout(dropout_layers: List[nn.Module]) -> None:
 
 def compute_entropy(probs: np.ndarray) -> float:
     """Compute Shannon entropy of a probability distribution.
-    Higher entropy = more uncertain."""
+    Higher entropy = more uncertain.
+    """
     probs = np.clip(probs, 1e-10, 1.0)
     probs = probs / probs.sum()
     entropy = -np.sum(probs * np.log(probs))
@@ -53,7 +54,8 @@ def compute_entropy(probs: np.ndarray) -> float:
 
 def compute_prediction_entropy(probs: np.ndarray) -> float:
     """Compute normalized entropy (0 = certain, 1 = maximally uncertain).
-    Normalized by max entropy for n classes."""
+    Normalized by max entropy for n classes.
+    """
     raw_entropy = compute_entropy(probs)
     max_entropy = np.log(len(probs))
     if max_entropy == 0:
@@ -65,7 +67,7 @@ def mc_dropout_forward_pass(
     model: nn.Module,
     image_tensor: torch.Tensor,
     n_passes: int = MC_DROPOUT_PASSES,
-) -> Tuple[np.ndarray, float, bool]:
+) -> tuple[np.ndarray, float, bool]:
     """Run T stochastic forward passes with dropout enabled.
 
     Args:
@@ -75,6 +77,7 @@ def mc_dropout_forward_pass(
 
     Returns:
         Tuple of (mean_probabilities, entropy, is_uncertain)
+
     """
     from retina_app.services.model_manager import DEVICE
 
@@ -136,7 +139,7 @@ def mc_dropout_single_model(
     image_path: str = None,
     n_passes: int = MC_DROPOUT_PASSES,
     input_tensor: torch.Tensor = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run MC Dropout uncertainty estimation for a single model.
 
     Accepts either image_path (loads and transforms internally) or
@@ -144,7 +147,6 @@ def mc_dropout_single_model(
 
     Returns dict with mean_probs, entropy, is_uncertain, individual_predictions.
     """
-    from retina_app.services.transforms import TRANSFORM
     from PIL import Image
 
     if input_tensor is None:
@@ -154,9 +156,7 @@ def mc_dropout_single_model(
             image = pil_img.convert("RGB")
             input_tensor = TRANSFORM(image).unsqueeze(0)
 
-    mean_probs, entropy, is_uncertain = mc_dropout_forward_pass(
-        model, input_tensor, n_passes
-    )
+    mean_probs, entropy, is_uncertain = mc_dropout_forward_pass(model, input_tensor, n_passes)
 
     max_idx = int(np.argmax(mean_probs))
     confidence = float(mean_probs[max_idx])
@@ -172,11 +172,11 @@ def mc_dropout_single_model(
 
 
 def mc_dropout_ensemble(
-    models: Dict[str, nn.Module],
+    models: dict[str, nn.Module],
     image_path: str,
-    model_weights: Dict[str, float] = None,
+    model_weights: dict[str, float] = None,
     n_passes: int = MC_DROPOUT_PASSES,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run MC Dropout across an ensemble of models.
 
     Loads and transforms image ONCE, then passes the tensor to each model.
@@ -185,9 +185,9 @@ def mc_dropout_ensemble(
 
     Returns dict with aggregated predictions and uncertainty metrics.
     """
-    from retina_app.constants import MODEL_WEIGHTS
-    from retina_app.services.transforms import TRANSFORM
     from PIL import Image
+
+    from retina_app.constants import MODEL_WEIGHTS
 
     if model_weights is None:
         model_weights = MODEL_WEIGHTS
@@ -212,9 +212,7 @@ def mc_dropout_ensemble(
 
     for model_type, model in models.items():
         try:
-            result = mc_dropout_single_model(
-                model, n_passes=n_passes, input_tensor=shared_tensor
-            )
+            result = mc_dropout_single_model(model, n_passes=n_passes, input_tensor=shared_tensor)
             weight = model_weights.get(model_type, 1.0 / len(models))
             result["weight"] = weight
             result["model_type"] = model_type
@@ -287,6 +285,7 @@ def compute_ensemble_disagreement(predictions):
 
     Returns:
         float: disagreement score (0 = full agreement, 1 = full disagreement)
+
     """
     if len(predictions) < 2:
         return 0.0
@@ -298,8 +297,7 @@ def compute_ensemble_disagreement(predictions):
     return n_disagree / len(votes)
 
 
-def calibrate_threshold(signal_values, true_labels, predictions,
-                          metric="f1", n_steps=50):
+def calibrate_threshold(signal_values, true_labels, predictions, metric="f1", n_steps=50):
     """Find optimal uncertainty threshold via validation sweep.
 
     Args:
@@ -311,6 +309,7 @@ def calibrate_threshold(signal_values, true_labels, predictions,
 
     Returns:
         dict with optimal_threshold, best_score, and all_results
+
     """
     signal_values = np.array(signal_values)
     true_labels = np.array(true_labels)
@@ -365,12 +364,14 @@ def calibrate_threshold(signal_values, true_labels, predictions,
         else:
             score = float(np.mean(kept_preds == kept_labels))
 
-        all_results.append({
-            "threshold": float(threshold),
-            "score": score,
-            "refusal_rate": refusal_rate,
-            "n_kept": n_kept,
-        })
+        all_results.append(
+            {
+                "threshold": float(threshold),
+                "score": score,
+                "refusal_rate": refusal_rate,
+                "n_kept": n_kept,
+            }
+        )
 
     if not all_results:
         return {"optimal_threshold": min_val, "best_score": 0.0, "all_results": []}

@@ -1,16 +1,16 @@
-"""
-Management command to clean up old media files based on retention policy.
+"""Management command to clean up old media files based on retention policy.
 Deletes uploaded images older than MEDIA_RETENTION_DAYS and their associated files.
 """
 
-from django.core.management.base import BaseCommand
-from django.core.files.storage import default_storage
-from django.utils import timezone
-from django.conf import settings
-from datetime import timedelta
 import logging
+from datetime import timedelta
 
-from retina_app.models import UploadedImage, PredictionRecord
+from django.conf import settings
+from django.core.files.storage import default_storage
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from retina_app.models import PredictionRecord, UploadedImage
 
 logger = logging.getLogger("retina_app")
 

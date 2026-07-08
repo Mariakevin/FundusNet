@@ -5,23 +5,21 @@ import tempfile
 
 import cv2
 import numpy as np
-from unittest.mock import patch
-
 from django.test import TestCase
 
 from retina_app.constants import (
-    FUNDUS_VALIDATION_THRESHOLD,
-    FUNDUS_COLOR_MIN_RATIO,
-    FUNDUS_CIRCULARITY_MIN,
-    FUNDUS_AREA_MIN_RATIO,
     FUNDUS_AREA_MAX_RATIO,
-    FUNDUS_EDGE_MIN_RATIO,
+    FUNDUS_AREA_MIN_RATIO,
+    FUNDUS_CIRCULARITY_MIN,
+    FUNDUS_COLOR_MIN_RATIO,
     FUNDUS_EDGE_MAX_RATIO,
+    FUNDUS_EDGE_MIN_RATIO,
     FUNDUS_GREEN_CH_MIN_STD,
+    FUNDUS_VALIDATION_THRESHOLD,
 )
 from retina_app.services.fundus_validator import (
-    _check_color_distribution,
     _check_circular_region,
+    _check_color_distribution,
     _check_edge_density,
     _check_green_channel,
     _check_texture_regularity,
@@ -76,10 +74,10 @@ def _create_natural_scene_image(width=512, height=512):
     img = np.zeros((height, width, 3), dtype=np.uint8)
 
     # Blue sky top half
-    img[:height // 2, :] = [200, 150, 50]
+    img[: height // 2, :] = [200, 150, 50]
 
     # Green grass bottom half
-    img[height // 2:, :] = [50, 150, 50]
+    img[height // 2 :, :] = [50, 150, 50]
 
     # Random colors (trees, flowers)
     for _ in range(50):
@@ -253,6 +251,7 @@ class ValidateFundusImageTest(TestCase):
 
     def tearDown(self):
         import shutil
+
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _save_image(self, img, name="test.jpg"):
@@ -279,7 +278,7 @@ class ValidateFundusImageTest(TestCase):
         path = self._save_image(img)
         result = validate_fundus_image(path)
         # The text image's combined score determines the result
-         # We just verify the function runs and returns valid structure
+        # We just verify the function runs and returns valid structure
         self.assertIn("is_fundus", result)
         self.assertIn("confidence", result)
         self.assertGreaterEqual(result["confidence"], 0.0)

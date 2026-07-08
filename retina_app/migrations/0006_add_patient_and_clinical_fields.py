@@ -3,20 +3,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('retina_app', '0005_make_uploaded_image_nullable_in_prediction'),
+        ("retina_app", "0005_make_uploaded_image_nullable_in_prediction"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='predictionrecord',
-            name='patient_identifier',
-            field=models.CharField(blank=True, help_text='Patient MRN or ID', max_length=50),
+            model_name="predictionrecord",
+            name="patient_identifier",
+            field=models.CharField(blank=True, help_text="Patient MRN or ID", max_length=50),
         ),
         migrations.AddField(
-            model_name='predictionrecord',
-            name='clinical_notes',
-            field=models.TextField(blank=True, help_text='Clinician notes and observations'),
+            model_name="predictionrecord",
+            name="clinical_notes",
+            field=models.TextField(blank=True, help_text="Clinician notes and observations"),
         ),
     ]

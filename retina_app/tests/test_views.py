@@ -1,12 +1,14 @@
 """Tests for the SPA-only RetinaAI app — index_view and protected_media."""
+
+import os
+import tempfile
+from io import BytesIO
+from unittest.mock import patch
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.core.files.uploadedfile import SimpleUploadedFile
-from io import BytesIO
 from PIL import Image
-from unittest.mock import patch
-import tempfile
-import os
 
 from retina_app.models import UploadedImage
 
@@ -98,6 +100,7 @@ class IndexViewPostTests(TestCase):
     @patch("retina_app.views.predict_image")
     def test_post_inference_error_shows_error(self, mock_predict):
         from retina_app.services.exceptions import InferenceError
+
         mock_predict.side_effect = InferenceError("Test inference error")
         response = self.client.post(self.url, {"image": self._valid_image()})
         self.assertEqual(response.status_code, 200)
@@ -106,6 +109,7 @@ class IndexViewPostTests(TestCase):
     @patch("retina_app.views.predict_image")
     def test_post_model_load_error_shows_error(self, mock_predict):
         from retina_app.services.exceptions import ModelLoadError
+
         mock_predict.side_effect = ModelLoadError("No model loaded")
         response = self.client.post(self.url, {"image": self._valid_image()})
         self.assertEqual(response.status_code, 200)
@@ -114,6 +118,7 @@ class IndexViewPostTests(TestCase):
     @patch("retina_app.views.predict_image")
     def test_post_not_a_fundus_shows_error(self, mock_predict):
         from retina_app.services.exceptions import NotAFundusImageError
+
         mock_predict.side_effect = NotAFundusImageError("Not a retinal image")
         response = self.client.post(self.url, {"image": self._valid_image()})
         self.assertEqual(response.status_code, 200)
@@ -129,6 +134,7 @@ class IndexViewFundusValidationTests(TestCase):
     @patch("retina_app.views.predict_image")
     def test_not_a_fundus_error_rejected(self, mock_predict):
         from retina_app.services.exceptions import NotAFundusImageError
+
         mock_predict.side_effect = NotAFundusImageError("Image is not a retinal fundus photograph")
         img = SimpleUploadedFile("test.jpg", create_test_image_bytes(), content_type="image/jpeg")
         response = self.client.post(self.url, {"image": img})

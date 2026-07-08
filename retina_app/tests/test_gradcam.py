@@ -1,43 +1,47 @@
-"""
-Tests for Grad-CAM explainability.
-"""
+"""Tests for Grad-CAM explainability."""
+
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
-import torch.nn as nn
-from unittest.mock import patch, MagicMock
-from django.test import TestCase, SimpleTestCase
-
-from retina_app.constants import CATEGORIES, GRADCAM_ALPHA
+from django.test import SimpleTestCase
 
 
 class GetTargetLayerTest(SimpleTestCase):
     """Test target layer selection for different model architectures."""
 
     def test_resnet_target_layer(self):
-        from retina_app.services.gradcam import _get_target_layer
         import torchvision.models as models
+
+        from retina_app.services.gradcam import _get_target_layer
+
         model = models.resnet50(weights=None)
         layer = _get_target_layer(model, "resnet")
         self.assertEqual(layer, model.layer4)
 
     def test_efficientnet_target_layer(self):
-        from retina_app.services.gradcam import _get_target_layer
         import torchvision.models as models
+
+        from retina_app.services.gradcam import _get_target_layer
+
         model = models.efficientnet_b0(weights=None)
         layer = _get_target_layer(model, "efficientnet")
         self.assertEqual(layer, model.features[-1])
 
     def test_mobilenet_target_layer(self):
-        from retina_app.services.gradcam import _get_target_layer
         import torchvision.models as models
+
+        from retina_app.services.gradcam import _get_target_layer
+
         model = models.mobilenet_v3_small(weights=None)
         layer = _get_target_layer(model, "mobilenet")
         self.assertEqual(layer, model.features[-1])
 
     def test_squeezenet_target_layer(self):
-        from retina_app.services.gradcam import _get_target_layer
         import torchvision.models as models
+
+        from retina_app.services.gradcam import _get_target_layer
+
         model = models.squeezenet1_0(weights=None)
         layer = _get_target_layer(model, "squeezenet")
         self.assertEqual(layer, model.features[12])
@@ -47,8 +51,10 @@ class GradCAMInitTest(SimpleTestCase):
     """Test GradCAM initialization."""
 
     def test_creates_hooks(self):
-        from retina_app.services.gradcam import GradCAM
         import torchvision.models as models
+
+        from retina_app.services.gradcam import GradCAM
+
         model = models.resnet50(weights=None)
         gradcam = GradCAM(model, "resnet")
         self.assertIsNotNone(gradcam._forward_handle)
@@ -61,6 +67,7 @@ class DeprocessImageTest(SimpleTestCase):
 
     def test_output_shape(self):
         from retina_app.services.gradcam import _deprocess_image
+
         cam = np.random.rand(7, 7).astype(np.float32)
         original_size = (224, 224)
         result = _deprocess_image(cam, original_size)
@@ -68,12 +75,14 @@ class DeprocessImageTest(SimpleTestCase):
 
     def test_output_dtype(self):
         from retina_app.services.gradcam import _deprocess_image
+
         cam = np.random.rand(14, 14).astype(np.float32)
         result = _deprocess_image(cam, (112, 112))
         self.assertEqual(result.dtype, np.uint8)
 
     def test_output_range(self):
         from retina_app.services.gradcam import _deprocess_image
+
         cam = np.random.rand(7, 7).astype(np.float32)
         result = _deprocess_image(cam, (100, 100))
         self.assertTrue(np.all(result >= 0))
@@ -85,6 +94,7 @@ class BlendHeatmapTest(SimpleTestCase):
 
     def test_same_size_blend(self):
         from retina_app.services.gradcam import _blend_heatmap
+
         original = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
         heatmap = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
         result = _blend_heatmap(original, heatmap, alpha=0.5)
@@ -92,6 +102,7 @@ class BlendHeatmapTest(SimpleTestCase):
 
     def test_different_size_resizes(self):
         from retina_app.services.gradcam import _blend_heatmap
+
         original = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
         heatmap = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
         result = _blend_heatmap(original, heatmap, alpha=0.3)
@@ -102,8 +113,10 @@ class GradCAMGenerateTest(SimpleTestCase):
     """Test GradCAM generation with a real model."""
 
     def test_generate_returns_expected_keys(self):
-        from retina_app.services.gradcam import generate_gradcam
         import torchvision.models as models
+
+        from retina_app.services.gradcam import generate_gradcam
+
         model = models.resnet50(weights=None)
         model.eval()
 
@@ -135,7 +148,9 @@ class GradCAMGenerateTest(SimpleTestCase):
                                 mock_img.return_value = mock_ctx
 
                                 result = generate_gradcam(
-                                    model, "test.jpg", "resnet",
+                                    model,
+                                    "test.jpg",
+                                    "resnet",
                                     output_path="/tmp/test_gradcam.png",
                                 )
                                 self.assertIn("predicted_class", result)
@@ -147,18 +162,21 @@ class GetGradcamOutputPathTest(SimpleTestCase):
     """Test Grad-CAM output path generation."""
 
     def test_output_path_format(self):
-        from retina_app.services.gradcam import get_gradcam_output_path
         import tempfile
-        import os
+
+        from retina_app.services.gradcam import get_gradcam_output_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             path = get_gradcam_output_path(tmpdir, "test_image.jpg")
             self.assertTrue(path.endswith("_gradcam.png"))
             self.assertIn("gradcam", path)
 
     def test_creates_directory(self):
-        from retina_app.services.gradcam import get_gradcam_output_path
-        import tempfile
         import os
+        import tempfile
+
+        from retina_app.services.gradcam import get_gradcam_output_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             path = get_gradcam_output_path(tmpdir, "image.png")
             self.assertTrue(os.path.isdir(os.path.dirname(path)))

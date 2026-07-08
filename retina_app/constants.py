@@ -1,5 +1,4 @@
-"""
-Centralized constants for FundusNet application.
+"""Centralized constants for FundusNet application.
 Single source of truth for validation limits, categories, and model configuration.
 """
 
@@ -87,8 +86,7 @@ MC_DROPOUT_PASSES = 10  # Number of stochastic forward passes for uncertainty es
 UNCERTAINTY_THRESHOLD = 0.3  # Refuse classification if entropy exceeds this
 ENABLE_MC_DROPOUT = False  # Off by default (opt-in)
 UNCERTAINTY_REFUSAL_MESSAGE = (
-    "The model is uncertain about this classification. "
-    "Please consult an ophthalmologist for manual review."
+    "The model is uncertain about this classification. Please consult an ophthalmologist for manual review."
 )
 
 # --- Grad-CAM Explainability ---

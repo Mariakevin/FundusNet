@@ -4,15 +4,15 @@ import numpy as np
 from django.test import SimpleTestCase
 
 from evaluation.metrics import (
-    compute_ece,
-    compute_mce,
+    compute_auroc_per_class,
     compute_brier,
-    per_class_metrics,
+    compute_ece,
+    compute_error_detection_auroc,
+    compute_mce,
+    compute_reliability_data,
     confusion_matrix,
     overall_metrics,
-    compute_auroc_per_class,
-    compute_reliability_data,
-    compute_error_detection_auroc,
+    per_class_metrics,
 )
 
 

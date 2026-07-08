@@ -1,15 +1,12 @@
-import os
-import tempfile
-
 from django.test import TestCase
 
 from retina_app.constants import MAX_CACHE_SIZE
 from retina_app.services.image_cache import (
     IMAGE_CACHE,
-    get_cache_entry,
-    set_cache_entry,
     clear_image_cache,
+    get_cache_entry,
     get_cache_stats,
+    set_cache_entry,
 )
 
 

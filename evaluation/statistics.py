@@ -27,6 +27,7 @@ def mcnemar_test(labels_true, preds_a, preds_b, correction=True):
 
     Returns:
         dict with chi2_stat, p_value, significant (at alpha=0.05)
+
     """
     correct_a = preds_a == labels_true
     correct_b = preds_b == labels_true
@@ -73,6 +74,7 @@ def paired_t_test(scores_a, scores_b):
 
     Returns:
         dict with t_stat, p_value, significant (at alpha=0.05), mean_diff, ci_95
+
     """
     scores_a = np.asarray(scores_a, dtype=float)
     scores_b = np.asarray(scores_b, dtype=float)
@@ -108,8 +110,7 @@ def paired_t_test(scores_a, scores_b):
     }
 
 
-def bootstrap_confidence_interval(values, n_bootstrap=2000, ci_level=0.95,
-                                    statistic_fn=None, seed=42):
+def bootstrap_confidence_interval(values, n_bootstrap=2000, ci_level=0.95, statistic_fn=None, seed=42):
     """Compute bootstrap confidence interval for any statistic.
 
     Args:
@@ -121,6 +122,7 @@ def bootstrap_confidence_interval(values, n_bootstrap=2000, ci_level=0.95,
 
     Returns:
         dict with point_estimate, ci_lower, ci_upper, se
+
     """
     values = np.asarray(values, dtype=float)
     rng = np.random.RandomState(seed)
@@ -162,6 +164,7 @@ def compute_cohens_d(scores_a, scores_b):
 
     Returns:
         dict with cohens_d, interpretation
+
     """
     scores_a = np.asarray(scores_a, dtype=float)
     scores_b = np.asarray(scores_b, dtype=float)
@@ -203,7 +206,9 @@ def delong_auc_test(probs_a, probs_b, labels, n_classes):
 
     Returns:
         dict with auc_a, auc_b, z_stat, p_value, significant
+
     """
+
     def _auc_scores(probs, labels, class_idx):
         binary_labels = (labels == class_idx).astype(float)
         scores = probs[:, class_idx]
@@ -286,6 +291,7 @@ def bonferroni_correction(p_values):
 
     Returns:
         list of adjusted p-values (clipped at 1.0)
+
     """
     n = len(p_values)
     return [min(p * n, 1.0) for p in p_values]
@@ -299,6 +305,7 @@ def holm_correction(p_values):
 
     Returns:
         list of adjusted p-values
+
     """
     n = len(p_values)
     indexed = sorted(enumerate(p_values), key=lambda x: x[1])
@@ -330,6 +337,7 @@ def significance_summary_table(comparisons, correction_method="holm"):
 
     Returns:
         list of dicts with corrected p-values and significance flags
+
     """
     p_values = [c["p_value"] for c in comparisons]
 
@@ -340,13 +348,15 @@ def significance_summary_table(comparisons, correction_method="holm"):
 
     results = []
     for comp, adj_p in zip(comparisons, adjusted):
-        results.append({
-            "comparison": f"{comp['name_a']} vs {comp['name_b']}",
-            "metric": comp.get("metric", "accuracy"),
-            "raw_p": comp["p_value"],
-            "adjusted_p": adj_p,
-            "significant": bool(adj_p < 0.05),
-            "effect_size": comp.get("effect_size"),
-        })
+        results.append(
+            {
+                "comparison": f"{comp['name_a']} vs {comp['name_b']}",
+                "metric": comp.get("metric", "accuracy"),
+                "raw_p": comp["p_value"],
+                "adjusted_p": adj_p,
+                "significant": bool(adj_p < 0.05),
+                "effect_size": comp.get("effect_size"),
+            }
+        )
 
     return results

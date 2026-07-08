@@ -1,9 +1,7 @@
-"""
-Ensemble prediction logic — single model inference, TTA, weighted averaging.
-"""
+"""Ensemble prediction logic — single model inference, TTA, weighted averaging."""
 
 import logging
-from typing import Dict, Any, List
+from typing import Any
 
 import numpy as np
 import torch
@@ -13,16 +11,15 @@ from PIL import Image
 
 from retina_app.constants import (
     CATEGORIES,
-    MODEL_WEIGHTS,
     CLASS_PERFORMANCE_WEIGHTS,
-    TTA_AGGREGATION_METHOD,
-    TEMPERATURE_SCALING,
-    ENABLE_MC_DROPOUT,
     MC_DROPOUT_PASSES,
+    MODEL_WEIGHTS,
+    TEMPERATURE_SCALING,
+    TTA_AGGREGATION_METHOD,
 )
 from retina_app.services.exceptions import InferenceError
 from retina_app.services.model_manager import DEVICE
-from retina_app.services.transforms import TRANSFORMS, TRANSFORM
+from retina_app.services.transforms import TRANSFORM, TRANSFORMS
 
 logger = logging.getLogger("retina_app")
 
@@ -35,7 +32,7 @@ def apply_temperature_scaling(logits: torch.Tensor, temperature: float = TEMPERA
     return torch.softmax(scaled_logits, dim=1)
 
 
-def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = False) -> Dict[str, Any]:
+def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = False) -> dict[str, Any]:
     """Run inference on a single model with optional test-time augmentation."""
     with Image.open(image_path) as pil_img:
         image = pil_img.convert("RGB")
@@ -64,7 +61,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
                         if output.numel() != len(CATEGORIES):
                             if output.numel() % len(CATEGORIES) == 0:
                                 spatial_size = output.numel() // len(CATEGORIES)
-                                h = w = int(spatial_size ** 0.5)
+                                h = w = int(spatial_size**0.5)
                                 if h * w == spatial_size:
                                     output = output.view(len(CATEGORIES), h, w).mean(dim=(1, 2))
                                 else:
@@ -128,7 +125,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
                 if output.numel() != len(CATEGORIES):
                     if output.numel() % len(CATEGORIES) == 0:
                         spatial_size = output.numel() // len(CATEGORIES)
-                        h = w = int(spatial_size ** 0.5)
+                        h = w = int(spatial_size**0.5)
                         if h * w == spatial_size:
                             output = output.view(len(CATEGORIES), h, w)
                             output = output.mean(dim=(1, 2))
@@ -147,7 +144,7 @@ def _predict_single_model(model: nn.Module, image_path: str, use_tta: bool = Fal
             }
 
 
-def predict_models_parallel(models: Dict[str, nn.Module], image_path: str, use_tta: bool, executor) -> List[tuple]:
+def predict_models_parallel(models: dict[str, nn.Module], image_path: str, use_tta: bool, executor) -> list[tuple]:
     """Run parallel inference on multiple models using ThreadPoolExecutor."""
     predictions = []
 
@@ -174,7 +171,7 @@ def predict_models_parallel(models: Dict[str, nn.Module], image_path: str, use_t
     return predictions
 
 
-def ensemble_predictions(predictions: List[tuple]) -> Dict[str, Any]:
+def ensemble_predictions(predictions: list[tuple]) -> dict[str, Any]:
     """Combine predictions from multiple models using per-class dynamic weighted averaging."""
     if not predictions:
         raise ValueError("No predictions to ensemble")
@@ -220,17 +217,16 @@ def ensemble_predictions(predictions: List[tuple]) -> Dict[str, Any]:
             weighted_probs[j] += p * final_weight
             class_weights[j] += final_weight
 
-        model_details.append({
-            "model": model_type,
-            "label": predicted_class,
-            "confidence": confidence,
-            "weight": final_weight,
-        })
+        model_details.append(
+            {
+                "model": model_type,
+                "label": predicted_class,
+                "confidence": confidence,
+                "weight": final_weight,
+            }
+        )
 
-    normalized_probs = [
-        weighted_probs[i] / class_weights[i] if class_weights[i] > 0 else 0
-        for i in range(n_classes)
-    ]
+    normalized_probs = [weighted_probs[i] / class_weights[i] if class_weights[i] > 0 else 0 for i in range(n_classes)]
 
     total = sum(normalized_probs)
     if total > 0:
@@ -256,11 +252,11 @@ def ensemble_predictions(predictions: List[tuple]) -> Dict[str, Any]:
 
 
 def predict_with_uncertainty_ensemble(
-    models: Dict[str, nn.Module],
+    models: dict[str, nn.Module],
     image_path: str,
-    model_weights: Dict[str, float] = None,
+    model_weights: dict[str, float] = None,
     n_passes: int = MC_DROPOUT_PASSES,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run MC Dropout uncertainty quantification across an ensemble.
 
     Each model runs T stochastic forward passes with dropout enabled.
@@ -271,13 +267,14 @@ def predict_with_uncertainty_ensemble(
     from retina_app.services.uncertainty import mc_dropout_ensemble
 
     return mc_dropout_ensemble(
-        models, image_path,
+        models,
+        image_path,
         model_weights=model_weights,
         n_passes=n_passes,
     )
 
 
-def detect_model_disagreement(predictions: List[tuple]) -> Dict[str, Any]:
+def detect_model_disagreement(predictions: list[tuple]) -> dict[str, Any]:
     """Detect when models disagree on the predicted class.
 
     Returns disagreement analysis including which models disagree,
@@ -306,10 +303,7 @@ def detect_model_disagreement(predictions: List[tuple]) -> Dict[str, Any]:
     dominant_count = class_votes[dominant_class]
     agreement_level = dominant_count / n_models
 
-    disagreeing_models = [
-        mt for mt, label in model_predictions.items()
-        if label != dominant_class
-    ]
+    disagreeing_models = [mt for mt, label in model_predictions.items() if label != dominant_class]
 
     return {
         "disagreement": len(disagreeing_models) > 0,
@@ -322,9 +316,9 @@ def detect_model_disagreement(predictions: List[tuple]) -> Dict[str, Any]:
 
 
 def selective_ensemble(
-    predictions: List[tuple],
+    predictions: list[tuple],
     min_agreement: float = 0.5,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Selective ensemble that filters out outlier predictions.
 
     If models disagree strongly, keep only the models that agree
@@ -344,10 +338,7 @@ def selective_ensemble(
 
     if analysis["agreement_level"] >= min_agreement:
         majority_class = analysis["dominant_class"]
-        filtered = [
-            (mt, pred) for mt, pred in predictions
-            if pred["label"] == majority_class
-        ]
+        filtered = [(mt, pred) for mt, pred in predictions if pred["label"] == majority_class]
 
         if len(filtered) >= 2:
             logger.info(
@@ -362,8 +353,7 @@ def selective_ensemble(
             return result
 
     logger.warning(
-        f"Low agreement ({analysis['agreement_level']:.2f}) — using full ensemble. "
-        f"Votes: {analysis['class_votes']}"
+        f"Low agreement ({analysis['agreement_level']:.2f}) — using full ensemble. Votes: {analysis['class_votes']}"
     )
     result = ensemble_predictions(predictions)
     result["selective_ensemble"] = False
@@ -383,6 +373,7 @@ def compute_agreement_scores(predictions):
     Returns:
         dict with agreement_score (float 0-1), class_votes (dict),
         majority_class, n_models
+
     """
     if not predictions:
         return {
@@ -420,6 +411,7 @@ def selective_ensemble_adaptive(predictions, target_metric="accuracy"):
 
     Returns:
         dict with ensemble result, agreement_score, and individual scores
+
     """
     if not predictions:
         return None

@@ -1,14 +1,11 @@
-"""
-Tests for MC Dropout uncertainty quantification.
-"""
+"""Tests for MC Dropout uncertainty quantification."""
+
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch
 import torch.nn as nn
-from unittest.mock import patch, MagicMock
-from django.test import TestCase, SimpleTestCase
-
-from retina_app.constants import CATEGORIES, ENABLE_MC_DROPOUT
+from django.test import SimpleTestCase
 
 
 class ComputeEntropyTest(SimpleTestCase):
@@ -16,24 +13,28 @@ class ComputeEntropyTest(SimpleTestCase):
 
     def test_certain_distribution_low_entropy(self):
         from retina_app.services.uncertainty import compute_entropy
+
         probs = np.array([0.95, 0.02, 0.02, 0.01])
         entropy = compute_entropy(probs)
         self.assertLess(entropy, 0.3)
 
     def test_uniform_distribution_high_entropy(self):
         from retina_app.services.uncertainty import compute_entropy
+
         probs = np.array([0.25, 0.25, 0.25, 0.25])
         entropy = compute_entropy(probs)
         self.assertGreater(entropy, 1.3)
 
     def test_zero_entropy_certain(self):
         from retina_app.services.uncertainty import compute_entropy
+
         probs = np.array([1.0, 0.0, 0.0, 0.0])
         entropy = compute_entropy(probs)
         self.assertAlmostEqual(entropy, 0.0, places=5)
 
     def test_normalization(self):
         from retina_app.services.uncertainty import compute_entropy
+
         probs = np.array([2.0, 3.0, 1.0, 0.5])
         entropy = compute_entropy(probs)
         self.assertGreaterEqual(entropy, 0.0)
@@ -44,12 +45,14 @@ class ComputePredictionEntropyTest(SimpleTestCase):
 
     def test_certain_prediction(self):
         from retina_app.services.uncertainty import compute_prediction_entropy
+
         probs = np.array([0.95, 0.02, 0.02, 0.01])
         norm_entropy = compute_prediction_entropy(probs)
         self.assertLess(norm_entropy, 0.3)
 
     def test_uncertain_prediction(self):
         from retina_app.services.uncertainty import compute_prediction_entropy
+
         probs = np.array([0.25, 0.25, 0.25, 0.25])
         norm_entropy = compute_prediction_entropy(probs)
         self.assertGreater(norm_entropy, 0.9)
@@ -67,6 +70,7 @@ class EnableDisableDropoutTest(SimpleTestCase):
 
     def test_enable_dropout_sets_train_mode(self):
         from retina_app.services.uncertainty import _enable_dropout
+
         model = self._make_model_with_dropout()
         model.eval()
         dropout_layers = _enable_dropout(model)
@@ -75,7 +79,8 @@ class EnableDisableDropoutTest(SimpleTestCase):
         self.assertFalse(model[0].training)
 
     def test_disable_dropout_restores_eval(self):
-        from retina_app.services.uncertainty import _enable_dropout, _disable_dropout
+        from retina_app.services.uncertainty import _disable_dropout, _enable_dropout
+
         model = self._make_model_with_dropout()
         dropout_layers = _enable_dropout(model)
         _disable_dropout(dropout_layers)
@@ -98,12 +103,11 @@ class MCDropoutForwardPassTest(SimpleTestCase):
     @patch("retina_app.services.model_manager.DEVICE", torch.device("cpu"))
     def test_returns_correct_shape(self):
         from retina_app.services.uncertainty import mc_dropout_forward_pass
+
         model = self._make_model()
         model.eval()
         tensor = torch.randn(1, 3, 224, 224)
-        mean_probs, entropy, is_uncertain = mc_dropout_forward_pass(
-            model, tensor, n_passes=5
-        )
+        mean_probs, entropy, is_uncertain = mc_dropout_forward_pass(model, tensor, n_passes=5)
         self.assertEqual(mean_probs.shape, (4,))
         self.assertIsInstance(entropy, float)
         self.assertIsInstance(is_uncertain, (bool, np.bool_))
@@ -111,6 +115,7 @@ class MCDropoutForwardPassTest(SimpleTestCase):
     @patch("retina_app.services.model_manager.DEVICE", torch.device("cpu"))
     def test_probs_sum_to_one(self):
         from retina_app.services.uncertainty import mc_dropout_forward_pass
+
         model = self._make_model()
         model.eval()
         tensor = torch.randn(1, 3, 224, 224)
@@ -120,6 +125,7 @@ class MCDropoutForwardPassTest(SimpleTestCase):
     @patch("retina_app.services.model_manager.DEVICE", torch.device("cpu"))
     def test_restores_eval_mode(self):
         from retina_app.services.uncertainty import mc_dropout_forward_pass
+
         model = self._make_model()
         model.eval()
         tensor = torch.randn(1, 3, 224, 224)
@@ -134,6 +140,7 @@ class IsDropoutEnabledTest(SimpleTestCase):
 
     def test_default_is_disabled(self):
         from retina_app.services.uncertainty import is_dropout_enabled
+
         self.assertFalse(is_dropout_enabled())
 
 
@@ -143,6 +150,7 @@ class MCDropoutEnsembleTest(SimpleTestCase):
     @patch("retina_app.services.model_manager.DEVICE", torch.device("cpu"))
     def test_empty_models_returns_uncertain(self):
         from retina_app.services.uncertainty import mc_dropout_ensemble
+
         result = mc_dropout_ensemble({}, "dummy_path.jpg")
         self.assertTrue(result["is_uncertain"])
         self.assertEqual(result["confidence"], 0.0)
@@ -150,10 +158,11 @@ class MCDropoutEnsembleTest(SimpleTestCase):
 
     @patch("retina_app.services.model_manager.DEVICE", torch.device("cpu"))
     @patch("retina_app.services.uncertainty.mc_dropout_single_model")
-    @patch("retina_app.services.transforms.TRANSFORM")
+    @patch("retina_app.services.uncertainty.TRANSFORM")
     @patch("PIL.Image.open")
     def test_single_model_result(self, mock_img_open, mock_transform, mock_single):
         from retina_app.services.uncertainty import mc_dropout_ensemble
+
         # Mock image loading
         mock_ctx = MagicMock()
         mock_ctx.__enter__ = lambda s: s

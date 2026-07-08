@@ -1,18 +1,19 @@
-"""
-Development settings for RetinaAI.
+"""Development settings for RetinaAI.
 Import from base and override for development.
 """
 
-from .base import *  # noqa: F401, F403
-from pathlib import Path
 import os
+
+from .base import *  # noqa: F401, F403
 
 # Security - relaxed for development
 DEBUG = os.getenv("DJANGO_DEBUG", "True").strip().lower() in {"1", "true", "yes", "on"}
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-change-me-before-deployment")
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()]
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()
+]
 
 # Session and CSRF (relaxed for dev)
 SESSION_COOKIE_SECURE = False

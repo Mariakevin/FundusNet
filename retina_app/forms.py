@@ -1,7 +1,7 @@
 from django import forms
 
-from .models import UploadedImage
 from .constants import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, MAX_FILE_SIZE
+from .models import UploadedImage
 
 
 class ImageUploadForm(forms.ModelForm):
@@ -11,12 +11,14 @@ class ImageUploadForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["image"].widget.attrs.update({
-            "class": "form-input",
-            "accept": "image/jpeg,image/png,image/bmp,image/webp",
-            "required": True,
-            "data-max-size": str(MAX_FILE_SIZE),
-        })
+        self.fields["image"].widget.attrs.update(
+            {
+                "class": "form-input",
+                "accept": "image/jpeg,image/png,image/bmp,image/webp",
+                "required": True,
+                "data-max-size": str(MAX_FILE_SIZE),
+            }
+        )
 
     def clean_image(self):
         image = self.cleaned_data.get("image")
@@ -32,6 +34,6 @@ class ImageUploadForm(forms.ModelForm):
             raise forms.ValidationError("Invalid file type. Please upload a supported image format.")
 
         if image.size > MAX_FILE_SIZE:
-            raise forms.ValidationError(f"File is too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB.")
-        
+            raise forms.ValidationError(f"File is too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB.")
+
         return image

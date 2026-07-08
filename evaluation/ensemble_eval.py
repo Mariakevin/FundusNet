@@ -7,29 +7,29 @@ Transforms the heuristic selective ensemble into a principled method by:
 4. Reporting accuracy-refusal tradeoff curves
 """
 
+import json
 import os
 import sys
-import json
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
-from evaluation.metrics import overall_metrics, per_class_metrics
-from evaluation.evaluate import load_dataset, evaluate_ensemble
+from evaluation.evaluate import load_dataset
+from evaluation.metrics import overall_metrics
 from retina_app.constants import CATEGORIES, MODEL_LIST, MODEL_WEIGHTS
-from retina_app.services.model_manager import get_model_manager
 from retina_app.services.ensemble import (
     _predict_single_model,
-    detect_model_disagreement,
     ensemble_predictions,
-    selective_ensemble,
 )
+from retina_app.services.model_manager import get_model_manager
 
 
 def compute_agreement_scores(models, file_paths, model_weights):
@@ -37,6 +37,7 @@ def compute_agreement_scores(models, file_paths, model_weights):
 
     Returns:
         list of dicts with: ensemble_pred, individual_preds, agreement_score, n_models
+
     """
     results = []
 
@@ -54,7 +55,6 @@ def compute_agreement_scores(models, file_paths, model_weights):
             continue
 
         pred_list = list(individual_preds.values())
-        agreement_info = detect_model_disagreement(pred_list)
 
         # Compute continuous agreement score
         votes = [p["label"] for p in pred_list]
@@ -67,15 +67,17 @@ def compute_agreement_scores(models, file_paths, model_weights):
         # Ensemble prediction
         ensemble_pred = ensemble_predictions(pred_list)
 
-        results.append({
-            "path": path,
-            "ensemble_label": ensemble_pred["label"],
-            "ensemble_confidence": ensemble_pred["confidence"],
-            "ensemble_probabilities": ensemble_pred["probabilities"],
-            "agreement_score": agreement_score,
-            "n_models": len(individual_preds),
-            "individual_labels": [p["label"] for p in pred_list],
-        })
+        results.append(
+            {
+                "path": path,
+                "ensemble_label": ensemble_pred["label"],
+                "ensemble_confidence": ensemble_pred["confidence"],
+                "ensemble_probabilities": ensemble_pred["probabilities"],
+                "agreement_score": agreement_score,
+                "n_models": len(individual_preds),
+                "individual_labels": [p["label"] for p in pred_list],
+            }
+        )
 
     return results
 
@@ -85,13 +87,14 @@ def sweep_selective_ensemble(results, true_labels, thresholds=None):
 
     Returns:
         list of {threshold, accuracy, refusal_rate, n_kept, macro_f1}
+
     """
     if thresholds is None:
         thresholds = np.arange(0.3, 1.05, 0.05)
 
     ensemble_labels = np.array([r["ensemble_label"] for r in results])
     agreement_scores = np.array([r["agreement_score"] for r in results])
-    true_labels = np.array(true_labels[:len(results)])
+    true_labels = np.array(true_labels[: len(results)])
 
     sweep_results = []
 
@@ -110,13 +113,15 @@ def sweep_selective_ensemble(results, true_labels, thresholds=None):
             acc = 0.0
             macro_f1 = 0.0
 
-        sweep_results.append({
-            "threshold": float(threshold),
-            "accuracy": acc,
-            "macro_f1": macro_f1,
-            "refusal_rate": refusal_rate,
-            "n_kept": n_kept,
-        })
+        sweep_results.append(
+            {
+                "threshold": float(threshold),
+                "accuracy": acc,
+                "macro_f1": macro_f1,
+                "refusal_rate": refusal_rate,
+                "n_kept": n_kept,
+            }
+        )
 
     return sweep_results
 
@@ -129,16 +134,18 @@ def find_pareto_optimal(sweep_results):
 
     Returns:
         list of Pareto-optimal sweep results
+
     """
     pareto = []
     for i, point in enumerate(sweep_results):
         dominated = False
         for j, other in enumerate(sweep_results):
             if i != j:
-                if (other["accuracy"] >= point["accuracy"] and
-                    other["refusal_rate"] <= point["refusal_rate"] and
-                    (other["accuracy"] > point["accuracy"] or
-                     other["refusal_rate"] < point["refusal_rate"])):
+                if (
+                    other["accuracy"] >= point["accuracy"]
+                    and other["refusal_rate"] <= point["refusal_rate"]
+                    and (other["accuracy"] > point["accuracy"] or other["refusal_rate"] < point["refusal_rate"])
+                ):
                     dominated = True
                     break
         if not dominated:
@@ -147,8 +154,7 @@ def find_pareto_optimal(sweep_results):
     return pareto
 
 
-def run_ensemble_evaluation(dataset_dir, n_folds=5, model_list=None, seed=42,
-                             output_dir=None):
+def run_ensemble_evaluation(dataset_dir, n_folds=5, model_list=None, seed=42, output_dir=None):
     """Run selective ensemble formalization study."""
     file_paths, labels, class_names = load_dataset(dataset_dir)
 
@@ -202,9 +208,11 @@ def run_ensemble_evaluation(dataset_dir, n_folds=5, model_list=None, seed=42,
         fold_results.append(fold_result)
 
         if best_low_refusal:
-            print(f"  Best @ <30% refusal: threshold={best_low_refusal['threshold']:.2f}, "
-                  f"acc={best_low_refusal['accuracy']:.4f}, "
-                  f"refusal={best_low_refusal['refusal_rate']:.2%}")
+            print(
+                f"  Best @ <30% refusal: threshold={best_low_refusal['threshold']:.2f}, "
+                f"acc={best_low_refusal['accuracy']:.4f}, "
+                f"refusal={best_low_refusal['refusal_rate']:.2%}"
+            )
 
     # Aggregate
     summary = aggregate_ensemble_results(fold_results)
@@ -269,13 +277,16 @@ def print_ensemble_summary(results):
     print("  " + "-" * 36)
 
     for t, metrics in sorted(s.get("threshold_sweep", {}).items()):
-        print(f"  {float(t):>10.2f} "
-              f"{metrics['accuracy_mean']:.4f}±{metrics['accuracy_std']:.4f} "
-              f"{metrics['refusal_mean']:.2%}±{metrics['refusal_std']:.2%}")
+        print(
+            f"  {float(t):>10.2f} "
+            f"{metrics['accuracy_mean']:.4f}±{metrics['accuracy_std']:.4f} "
+            f"{metrics['refusal_mean']:.2%}±{metrics['refusal_std']:.2%}"
+        )
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="retina_dataset")
     parser.add_argument("--folds", type=int, default=5)

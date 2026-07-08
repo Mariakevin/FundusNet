@@ -6,18 +6,20 @@ produce files when save_path is given, and return matplotlib Figure objects.
 
 import os
 import tempfile
-import numpy as np
 from unittest import TestCase
+
+import numpy as np
+
 from evaluation.figures import (
-    plot_confusion_matrix,
-    plot_roc_curves,
-    plot_reliability_diagram,
-    plot_accuracy_refusal,
     plot_ablation_bars,
-    plot_training_curves,
+    plot_accuracy_refusal,
     plot_class_distribution,
-    plot_model_comparison,
+    plot_confusion_matrix,
     plot_gradcam_grid,
+    plot_model_comparison,
+    plot_reliability_diagram,
+    plot_roc_curves,
+    plot_training_curves,
     plot_uncertainty_analysis,
 )
 
@@ -45,7 +47,7 @@ class TestConfusionMatrix(TestCase):
         cm = np.eye(4, dtype=int) * 25
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "cm.png")
-            fig = plot_confusion_matrix(cm, CATEGORIES, save_path=path)
+            plot_confusion_matrix(cm, CATEGORIES, save_path=path)
             self.assertTrue(os.path.exists(path))
             self.assertTrue(os.path.exists(path.replace(".png", ".pdf")))
 
@@ -135,7 +137,7 @@ class TestTrainingCurves(TestCase):
     def test_runs(self):
         losses = np.linspace(1.5, 0.3, 15).tolist()
         accs = np.linspace(0.4, 0.92, 15).tolist()
-        fig = plot_training_curves(losses, [l + 0.1 for l in losses], accs, [a - 0.03 for a in accs])
+        fig = plot_training_curves(losses, [x + 0.1 for x in losses], accs, [a - 0.03 for a in accs])
         self.assertIsNotNone(fig)
 
 
@@ -160,22 +162,14 @@ class TestModelComparison(TestCase):
 class TestGradCAMGrid(TestCase):
     def test_runs(self):
         rng = np.random.RandomState(0)
-        images = [
-            (rng.randint(0, 255, (64, 64, 3), dtype=np.uint8),
-             rng.rand(64, 64))
-            for _ in range(4)
-        ]
+        images = [(rng.randint(0, 255, (64, 64, 3), dtype=np.uint8), rng.rand(64, 64)) for _ in range(4)]
         preds = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
         fig = plot_gradcam_grid(images, preds)
         self.assertIsNotNone(fig)
 
     def test_with_ground_truth(self):
         rng = np.random.RandomState(1)
-        images = [
-            (rng.randint(0, 255, (64, 64, 3), dtype=np.uint8),
-             rng.rand(64, 64))
-            for _ in range(3)
-        ]
+        images = [(rng.randint(0, 255, (64, 64, 3), dtype=np.uint8), rng.rand(64, 64)) for _ in range(3)]
         fig = plot_gradcam_grid(images, ["A", "B", "C"], ground_truths=["A", "B", "C"])
         self.assertIsNotNone(fig)
 

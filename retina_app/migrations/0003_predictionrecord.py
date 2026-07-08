@@ -6,26 +6,39 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('retina_app', '0002_uploadedimage_user'),
+        ("retina_app", "0002_uploadedimage_user"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='PredictionRecord',
+            name="PredictionRecord",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('predicted_class', models.CharField(max_length=64)),
-                ('confidence', models.FloatField()),
-                ('model_version', models.CharField(default='resnet50-v1', max_length=128)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('uploaded_image', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='predictions', to='retina_app.uploadedimage')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='predictions', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("predicted_class", models.CharField(max_length=64)),
+                ("confidence", models.FloatField()),
+                ("model_version", models.CharField(default="resnet50-v1", max_length=128)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "uploaded_image",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="predictions",
+                        to="retina_app.uploadedimage",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="predictions",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

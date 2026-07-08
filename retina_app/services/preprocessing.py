@@ -1,28 +1,36 @@
-"""
-Fundus image preprocessing pipeline.
+"""Fundus image preprocessing pipeline.
 CLAHE enhancement, ROI detection, quality assessment,
 adaptive CLAHE, noise reduction, color constancy.
 """
 
 import logging
-from typing import Dict, Any
+import os
+from typing import Any
 
 import cv2
 import numpy as np
-
-from retina_app.constants import (
-    MIN_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, MAX_FILE_SIZE, ALLOWED_EXTENSIONS,
-    ADAPTIVE_CLAHE_ENABLED, ADAPTIVE_CLAHE_DARK_CLIP, ADAPTIVE_CLAHE_NORMAL_CLIP,
-    ADAPTIVE_CLAHE_BRIGHT_CLIP, ADAPTIVE_CLAHE_DARK_THRESHOLD, ADAPTIVE_CLAHE_BRIGHT_THRESHOLD,
-    ADAPTIVE_CLAHE_DARK_TILE, ADAPTIVE_CLAHE_NORMAL_TILE, ADAPTIVE_CLAHE_BRIGHT_TILE,
-    NOISE_REDUCTION_ENABLED, NOISE_REDUCTION_STRENGTH, NOISE_REDUCTION_SPECULAR_ENABLED,
-    NOISE_REDUCTION_SPECULAR_KERNEL,
-    COLOR_CONSTANCY_ENABLED, COLOR_CONSTANCY_METHOD, COLOR_CONSTANCY_WHITE_PATCH_PERCENTILE,
-)
-from retina_app.services.exceptions import ImageValidationError
 from PIL import Image, ImageOps
 
-import os
+from retina_app.constants import (
+    ADAPTIVE_CLAHE_BRIGHT_CLIP,
+    ADAPTIVE_CLAHE_BRIGHT_THRESHOLD,
+    ADAPTIVE_CLAHE_BRIGHT_TILE,
+    ADAPTIVE_CLAHE_DARK_CLIP,
+    ADAPTIVE_CLAHE_DARK_THRESHOLD,
+    ADAPTIVE_CLAHE_DARK_TILE,
+    ADAPTIVE_CLAHE_NORMAL_CLIP,
+    ADAPTIVE_CLAHE_NORMAL_TILE,
+    ALLOWED_EXTENSIONS,
+    COLOR_CONSTANCY_METHOD,
+    COLOR_CONSTANCY_WHITE_PATCH_PERCENTILE,
+    MAX_FILE_SIZE,
+    MAX_IMAGE_DIMENSION,
+    MIN_IMAGE_DIMENSION,
+    NOISE_REDUCTION_SPECULAR_ENABLED,
+    NOISE_REDUCTION_SPECULAR_KERNEL,
+    NOISE_REDUCTION_STRENGTH,
+)
+from retina_app.services.exceptions import ImageValidationError
 
 logger = logging.getLogger("retina_app")
 
@@ -35,7 +43,7 @@ def validate_image_file(image_path: str) -> None:
     file_size = os.path.getsize(image_path)
     if file_size > MAX_FILE_SIZE:
         raise ImageValidationError(
-            f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB. Got {file_size / (1024*1024):.1f}MB"
+            f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB. Got {file_size / (1024 * 1024):.1f}MB"
         )
 
     if file_size == 0:
@@ -67,10 +75,10 @@ def apply_clahe(image: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tupl
     """Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) for enhanced fundus contrast."""
     if len(image.shape) == 3:
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
-        l, a, b = cv2.split(lab)
+        l_ch, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
-        l = clahe.apply(l)
-        lab = cv2.merge([l, a, b])
+        l_ch = clahe.apply(l_ch)
+        lab = cv2.merge([l_ch, a, b])
         return cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
     else:
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
@@ -104,14 +112,7 @@ def detect_fundus_roi(image: np.ndarray) -> tuple:
     blurred = cv2.GaussianBlur(gray, (15, 15), 0)
 
     circles = cv2.HoughCircles(
-        blurred,
-        cv2.HOUGH_GRADIENT,
-        dp=1,
-        minDist=100,
-        param1=50,
-        param2=30,
-        minRadius=50,
-        maxRadius=0
+        blurred, cv2.HOUGH_GRADIENT, dp=1, minDist=100, param1=50, param2=30, minRadius=50, maxRadius=0
     )
 
     if circles is not None and len(circles) > 0:
@@ -138,7 +139,7 @@ def detect_fundus_roi(image: np.ndarray) -> tuple:
     return image, (image.shape[1] // 2, image.shape[0] // 2), min(image.shape[:2]) // 2
 
 
-def assess_image_quality(image: np.ndarray) -> Dict[str, Any]:
+def assess_image_quality(image: np.ndarray) -> dict[str, Any]:
     """Assess fundus image quality and return quality metrics."""
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
@@ -161,11 +162,7 @@ def assess_image_quality(image: np.ndarray) -> Dict[str, Any]:
     edge_score = min(edge_density * 100, 1.0)
 
     overall_quality = (
-        blur_score * 0.3 +
-        brightness_score * 0.15 +
-        contrast_score * 0.25 +
-        saturation_score * 0.1 +
-        edge_score * 0.2
+        blur_score * 0.3 + brightness_score * 0.15 + contrast_score * 0.25 + saturation_score * 0.1 + edge_score * 0.2
     )
 
     quality_level = "good"
@@ -184,7 +181,7 @@ def assess_image_quality(image: np.ndarray) -> Dict[str, Any]:
     }
 
 
-def check_image_quality(image_path: str, quality_threshold: float = 0.3) -> Dict[str, Any]:
+def check_image_quality(image_path: str, quality_threshold: float = 0.3) -> dict[str, Any]:
     """Check if image meets quality standards."""
     image = cv2.imread(image_path)
     if image is None:
@@ -306,6 +303,7 @@ def apply_color_constancy(image: np.ndarray) -> np.ndarray:
     Methods:
     - gray_world: Normalizes so mean of each channel equals the mean of all channels.
     - white_patch: Normalizes using the brightest pixel in each channel.
+
     """
     if COLOR_CONSTANCY_METHOD == "white_patch":
         return _white_patch_correction(image)
@@ -336,7 +334,7 @@ def _white_patch_correction(image: np.ndarray) -> np.ndarray:
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def generate_preprocessing_viz(image_path: str) -> Dict[str, np.ndarray]:
+def generate_preprocessing_viz(image_path: str) -> dict[str, np.ndarray]:
     """Generate 4-panel preprocessing visualization: original, CLAHE, denoised, color corrected.
 
     Returns dict with panel names as keys and numpy arrays as values.
@@ -373,7 +371,7 @@ def generate_preprocessing_viz(image_path: str) -> Dict[str, np.ndarray]:
     }
 
 
-def save_preprocessing_viz(panels: Dict[str, np.ndarray], output_path: str) -> str:
+def save_preprocessing_viz(panels: dict[str, np.ndarray], output_path: str) -> str:
     """Save preprocessing visualization as a 2x2 grid image."""
     h, w = panels["original"].shape[:2]
     panel_h, panel_w = h // 2, w // 2
@@ -383,7 +381,7 @@ def save_preprocessing_viz(panels: Dict[str, np.ndarray], output_path: str) -> s
     for idx, (name, panel) in enumerate(panels.items()):
         row, col = divmod(idx, 2)
         resized = cv2.resize(panel, (panel_w, panel_h))
-        canvas[row * panel_h:(row + 1) * panel_h, col * panel_w:(col + 1) * panel_w] = resized
+        canvas[row * panel_h : (row + 1) * panel_h, col * panel_w : (col + 1) * panel_w] = resized
 
     labels = ["Original", "Adaptive CLAHE", "Denoised", "Color Corrected"]
     for idx, label in enumerate(labels):

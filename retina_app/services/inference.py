@@ -1,85 +1,73 @@
-"""
-Inference orchestrator — thin facade over preprocessing, model_manager, ensemble, cache.
+"""Inference orchestrator — thin facade over preprocessing, model_manager, ensemble, cache.
 All public API remains importable from this module for backward compatibility.
 """
 
-import os
-import time
-import tempfile
 import atexit
-import threading
 import logging
-from typing import Dict, Any
+import os
+import tempfile
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 import cv2
 import torch
+from django.conf import settings as django_settings
 from PIL import Image
 
 from retina_app.constants import (
-    CATEGORIES,
+    ADAPTIVE_CLAHE_ENABLED,
+    COLOR_CONSTANCY_ENABLED,
+    CONFIDENCE_THRESHOLD_HIGH,
+    CONFIDENCE_THRESHOLD_LOW,
+    ENABLE_MC_DROPOUT,
+    ENSEMBLE_MIN_MODELS,
+    FUNDUS_VALIDATION_ENABLED,
+    GRADCAM_MODEL,
+    MAX_WORKERS,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    ENSEMBLE_MIN_MODELS,
-    MAX_WORKERS,
-    CONFIDENCE_THRESHOLD_LOW,
-    CONFIDENCE_THRESHOLD_HIGH,
-    ENABLE_MC_DROPOUT,
-    GRADCAM_MODEL,
-    UNCERTAINTY_REFUSAL_MESSAGE,
-    FUNDUS_VALIDATION_ENABLED,
-    PREPROCESSING_VIZ_ENABLED,
-    ADAPTIVE_CLAHE_ENABLED,
     NOISE_REDUCTION_ENABLED,
-    COLOR_CONSTANCY_ENABLED,
+    PREPROCESSING_VIZ_ENABLED,
+    UNCERTAINTY_REFUSAL_MESSAGE,
 )
-from retina_app.services.exceptions import (
-    InferenceError,
-    ImageValidationError,
-    ImageCorruptError,
-    ImageSizeError,
-    ImageDimensionError,
-    ModelLoadError,
-    PreprocessingError,
-    NotAFundusImageError,
-)
-from retina_app.services.preprocessing import (
-    validate_image_file,
-    check_image_quality,
-    preprocess_fundus,
-    apply_adaptive_clahe,
-    reduce_noise,
-    apply_color_constancy,
-    apply_clahe,
-    generate_preprocessing_viz,
-    save_preprocessing_viz,
-)
-from retina_app.services.fundus_validator import validate_fundus_image
-from retina_app.services.model_manager import (
-    get_model_manager,
-    get_health_tracker,
-    ModelManager,
-    MODEL_VERSIONS,
-    DEVICE,
-)
-from retina_app.services.transforms import TRANSFORMS, TRANSFORM
 from retina_app.services.ensemble import (
     _predict_single_model,
-    predict_models_parallel,
-    ensemble_predictions,
-    selective_ensemble,
     detect_model_disagreement,
+    predict_models_parallel,
     predict_with_uncertainty_ensemble,
+    selective_ensemble,
 )
+from retina_app.services.exceptions import (
+    ImageCorruptError,
+    ImageValidationError,
+    InferenceError,
+    NotAFundusImageError,
+)
+from retina_app.services.fundus_validator import validate_fundus_image
 from retina_app.services.gradcam import generate_gradcam, get_gradcam_output_path
 from retina_app.services.image_cache import (
     _get_image_hash,
     get_cache_entry,
     set_cache_entry,
-    clear_image_cache,
-    get_cache_stats,
 )
-from django.conf import settings as django_settings
+from retina_app.services.model_manager import (
+    MODEL_VERSIONS,
+    get_health_tracker,
+    get_model_manager,
+)
+from retina_app.services.preprocessing import (
+    apply_adaptive_clahe,
+    apply_clahe,
+    apply_color_constancy,
+    check_image_quality,
+    generate_preprocessing_viz,
+    preprocess_fundus,
+    reduce_noise,
+    save_preprocessing_viz,
+    validate_image_file,
+)
 
 logger = logging.getLogger("retina_app")
 
@@ -104,7 +92,7 @@ def predict_image(
     use_clahe: bool = False,
     use_uncertainty: bool = False,
     use_gradcam: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run inference with optional ensemble of multiple models and test-time augmentation.
 
     Args:
@@ -114,6 +102,7 @@ def predict_image(
         use_clahe: Apply CLAHE preprocessing
         use_uncertainty: Run MC Dropout uncertainty quantification
         use_gradcam: Generate Grad-CAM explainability heatmap
+
     """
     start_time = time.time()
 
@@ -202,13 +191,10 @@ def predict_image(
     try:
         if use_ensemble and len(model_manager._models) >= ENSEMBLE_MIN_MODELS:
             logger.info(
-                f"Running ensemble with {len(model_manager._models)} models: "
-                f"{list(model_manager._models.keys())}"
+                f"Running ensemble with {len(model_manager._models)} models: {list(model_manager._models.keys())}"
             )
 
-            predictions = predict_models_parallel(
-                model_manager._models, target_path, use_tta, get_executor()
-            )
+            predictions = predict_models_parallel(model_manager._models, target_path, use_tta, get_executor())
 
             health_tracker = get_health_tracker()
             health_tracker.record_ensemble_prediction(predictions)
@@ -222,15 +208,9 @@ def predict_image(
 
             final_result = selective_ensemble(predictions)
             n_models_used = final_result.get("n_models", len(predictions))
-            model_ver = (
-                f"ensemble-v{n_models_used}-models-tta"
-                if use_tta
-                else f"ensemble-v{n_models_used}-models"
-            )
+            model_ver = f"ensemble-v{n_models_used}-models-tta" if use_tta else f"ensemble-v{n_models_used}-models"
 
-            model_types = [
-                model_manager._model_types.get(mt, "unknown") for mt, _ in predictions
-            ]
+            model_types = [model_manager._model_types.get(mt, "unknown") for mt, _ in predictions]
             has_trained = "trained" in model_types
             model_source = "trained" if has_trained else "pretrained"
         else:
@@ -242,9 +222,12 @@ def predict_image(
         latency = time.time() - start_time
 
         mode_str = (
-            "Ensemble+TTA" if use_ensemble and use_tta
-            else "Ensemble" if use_ensemble
-            else "TTA" if use_tta
+            "Ensemble+TTA"
+            if use_ensemble and use_tta
+            else "Ensemble"
+            if use_ensemble
+            else "TTA"
+            if use_tta
             else "Standard"
         )
 
@@ -252,15 +235,16 @@ def predict_image(
         confidence_warning = None
         if confidence < CONFIDENCE_THRESHOLD_LOW:
             confidence_warning = "low"
-            logger.warning(
-                f"Low confidence prediction: {confidence:.2f} < {CONFIDENCE_THRESHOLD_LOW}"
-            )
+            logger.warning(f"Low confidence prediction: {confidence:.2f} < {CONFIDENCE_THRESHOLD_LOW}")
         elif confidence < CONFIDENCE_THRESHOLD_HIGH:
             confidence_warning = "medium"
 
         logger.info(
             "%s inference: %s (%.2f) in %.2fs",
-            mode_str, final_result["label"], confidence, latency,
+            mode_str,
+            final_result["label"],
+            confidence,
+            latency,
         )
 
         # --- MC Dropout Uncertainty ---
@@ -268,7 +252,8 @@ def predict_image(
         if use_uncertainty and ENABLE_MC_DROPOUT and use_ensemble:
             try:
                 uncertainty_data = predict_with_uncertainty_ensemble(
-                    model_manager._models, target_path,
+                    model_manager._models,
+                    target_path,
                     model_weights=MODEL_WEIGHTS,
                 )
                 logger.info(
@@ -285,11 +270,11 @@ def predict_image(
                 gradcam_model_type = GRADCAM_MODEL
                 if gradcam_model_type in model_manager._models:
                     gradcam_model = model_manager._models[gradcam_model_type]
-                    gradcam_output = get_gradcam_output_path(
-                        django_settings.MEDIA_ROOT, os.path.basename(image_path)
-                    )
+                    gradcam_output = get_gradcam_output_path(django_settings.MEDIA_ROOT, os.path.basename(image_path))
                     gradcam_result = generate_gradcam(
-                        gradcam_model, target_path, gradcam_model_type,
+                        gradcam_model,
+                        target_path,
+                        gradcam_model_type,
                         output_path=gradcam_output,
                     )
                     gradcam_url = f"{django_settings.MEDIA_URL}gradcam/{os.path.basename(gradcam_output)}"
@@ -309,10 +294,7 @@ def predict_image(
             final_result["label"] = "Uncertain"
             final_result["confidence"] = 0.0
             confidence_warning = "low"
-            logger.warning(
-                f"Classification refused: uncertainty={uncertainty_data['entropy']:.4f} "
-                f"> threshold"
-            )
+            logger.warning(f"Classification refused: uncertainty={uncertainty_data['entropy']:.4f} > threshold")
 
         result = {
             "label": final_result["label"],

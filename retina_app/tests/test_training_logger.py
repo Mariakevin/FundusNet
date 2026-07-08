@@ -1,11 +1,13 @@
 """Tests for TrainingLogger."""
 
-import json
 import csv
-import tempfile
+import json
 import shutil
+import tempfile
 from pathlib import Path
+
 from django.test import SimpleTestCase
+
 from retina_app.services.training_logger import TrainingLogger
 
 
@@ -20,7 +22,7 @@ class TrainingLoggerInitTest(SimpleTestCase):
 
     def test_creates_output_dir(self):
         output = Path(self.tmp_dir) / "new_dir"
-        logger = TrainingLogger(output_dir=str(output))
+        TrainingLogger(output_dir=str(output))
         self.assertTrue(output.exists())
 
     def test_default_run_name(self):

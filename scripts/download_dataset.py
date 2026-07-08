@@ -12,16 +12,16 @@ Expected output structure under retina_dataset/:
     └── 4_Diabetic_Retinopathy/
 """
 
-import os
-import sys
-import shutil
-import zipfile
 import argparse
+import shutil
+import sys
+import zipfile
 from pathlib import Path
 
 try:
     from tqdm import tqdm
 except ImportError:
+
     def tqdm(iterable, **kwargs):
         return iterable
 
@@ -43,9 +43,9 @@ LABEL_MAP = {
 KAGGLE_URL = "https://www.kaggle.com/datasets/andrewmvd/ocular-disease-recognition-odir5k"
 
 MANUAL_INSTRUCTIONS = f"""
-{'=' * 70}
+{"=" * 70}
   MANUAL DOWNLOAD REQUIRED
-{'=' * 70}
+{"=" * 70}
 
   Automatic download via kagglehub failed or is unavailable.
 
@@ -56,10 +56,10 @@ MANUAL_INSTRUCTIONS = f"""
   3. Unzip the downloaded file
   4. Organise the images into:
 
-       {DATASET_DIR / '1_normal' /}
-       {DATASET_DIR / '2_cataract' /}
-       {DATASET_DIR / '3_glaucoma' /}
-       {DATASET_DIR / '4_Diabetic_Retinopathy' /}
+        retina_dataset/1_normal/
+        retina_dataset/2_cataract/
+        retina_dataset/3_glaucoma/
+        retina_dataset/4_Diabetic_Retinopathy/
 
      Refer to the dataset's labels.csv for the left/right eye label
      columns (N, C, G, D) per image.
@@ -71,7 +71,7 @@ MANUAL_INSTRUCTIONS = f"""
       pip install kagglehub
       python scripts/download_dataset.py
 
-{'=' * 70}
+{"=" * 70}
 """
 
 
@@ -226,9 +226,7 @@ def organise_extracted_folder(source_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Download and organise ODIR-5K retinal fundus dataset."
-    )
+    parser = argparse.ArgumentParser(description="Download and organise ODIR-5K retinal fundus dataset.")
     parser.add_argument(
         "--zip",
         help="Path to a pre-downloaded ODIR-5K archive.zip (skip download)",

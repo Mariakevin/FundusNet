@@ -5,7 +5,6 @@ metrics, and confusion matrix generation.
 """
 
 import numpy as np
-from collections import defaultdict
 
 
 def compute_ece(probs, labels, n_bins=15):
@@ -21,6 +20,7 @@ def compute_ece(probs, labels, n_bins=15):
 
     Returns:
         float: ECE value (0 = perfectly calibrated)
+
     """
     confidences = np.max(probs, axis=1)
     predictions = np.argmax(probs, axis=1)
@@ -53,6 +53,7 @@ def compute_mce(probs, labels, n_bins=15):
 
     Returns:
         float: MCE value
+
     """
     confidences = np.max(probs, axis=1)
     predictions = np.argmax(probs, axis=1)
@@ -83,8 +84,8 @@ def compute_brier(probs, labels):
 
     Returns:
         float: Brier score
+
     """
-    n_classes = probs.shape[1]
     one_hot = np.zeros_like(probs)
     one_hot[np.arange(len(labels)), labels] = 1.0
     return float(np.mean(np.sum((probs - one_hot) ** 2, axis=1)))
@@ -95,6 +96,7 @@ def compute_reliability_data(probs, labels, n_bins=15):
 
     Returns:
         dict with keys: bin_centers, bin_accuracies, bin_confidences, bin_counts
+
     """
     confidences = np.max(probs, axis=1)
     predictions = np.argmax(probs, axis=1)
@@ -139,6 +141,7 @@ def per_class_metrics(predictions, labels, categories):
 
     Returns:
         dict: {class_name: {precision, recall, f1, support, tp, fp, fn}}
+
     """
     results = {}
     for i, cat in enumerate(categories):
@@ -174,6 +177,7 @@ def confusion_matrix(predictions, labels, n_classes):
 
     Returns:
         (n_classes, n_classes) numpy array where [i,j] = true=i, pred=j
+
     """
     cm = np.zeros((n_classes, n_classes), dtype=int)
     for t, p in zip(labels, predictions):
@@ -191,6 +195,7 @@ def overall_metrics(predictions, labels, categories):
 
     Returns:
         dict with accuracy, macro_f1, weighted_f1, total_samples
+
     """
     n_classes = len(categories)
     accuracy = float(np.mean(predictions == labels))
@@ -223,6 +228,7 @@ def compute_auroc_per_class(probs, labels, n_classes):
 
     Returns:
         list of AUROC values per class
+
     """
     aurocs = []
     for c in range(n_classes):
@@ -273,6 +279,7 @@ def compute_error_detection_auroc(uncertainty_signals, is_correct):
 
     Returns:
         float: AUROC (1.0 = perfect error detection, 0.5 = random)
+
     """
     return compute_auroc_per_class(
         np.column_stack([1 - uncertainty_signals, uncertainty_signals]),

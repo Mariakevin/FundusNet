@@ -1,10 +1,10 @@
-"""
-Production settings for RetinaAI.
+"""Production settings for RetinaAI.
 Import from base and override for production.
 """
 
-from .base import *  # noqa: F401, F403
 import os
+
+from .base import *  # noqa: F401, F403
 
 # Security - strict for production
 DEBUG = os.getenv("DJANGO_DEBUG", "False").strip().lower() in {"1", "true", "yes", "on"}
@@ -12,12 +12,14 @@ DEBUG = os.getenv("DJANGO_DEBUG", "False").strip().lower() in {"1", "true", "yes
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     import sys
+
     print("ERROR: DJANGO_SECRET_KEY environment variable is required in production!", file=sys.stderr)
     sys.exit(1)
 
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
 if not ALLOWED_HOSTS:
     import sys
+
     print("ERROR: DJANGO_ALLOWED_HOSTS environment variable is required in production!", file=sys.stderr)
     sys.exit(1)
 

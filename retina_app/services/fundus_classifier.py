@@ -5,11 +5,11 @@ Replaces hand-tuned heuristic thresholds with a trained model.
 """
 
 import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models, transforms
-from pathlib import Path
 
 
 class FundusClassifier(nn.Module):
@@ -24,9 +24,7 @@ class FundusClassifier(nn.Module):
         super().__init__()
 
         # Load pretrained EfficientNet-B0
-        self.backbone = models.efficientnet_b0(
-            weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1
-        )
+        self.backbone = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
 
         # Get the number of features from the backbone
         in_features = self.backbone.classifier[1].in_features
@@ -45,15 +43,17 @@ class FundusClassifier(nn.Module):
                 param.requires_grad = True
 
         # Default transform
-        self.transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-            ),
-        ])
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225],
+                ),
+            ]
+        )
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -65,6 +65,7 @@ class FundusClassifier(nn.Module):
 
         Returns:
             (B, 2) logits, or (B,) probabilities if sigmoid=True
+
         """
         return self.backbone(x)
 
@@ -76,6 +77,7 @@ class FundusClassifier(nn.Module):
 
         Returns:
             dict with is_fundus (bool), confidence (float), probability (float)
+
         """
         self.eval()
         if image_tensor.dim() == 3:
@@ -102,19 +104,24 @@ class FundusClassifier(nn.Module):
 
         Returns:
             dict with is_fundus, confidence, probability
+
         """
         from retina_app.services.transforms import TRANSFORM
+
         tensor = TRANSFORM(pil_image.convert("RGB"))
         return self.predict(tensor)
 
     def save(self, path):
         """Save model checkpoint."""
-        torch.save({
-            "model_state_dict": self.state_dict(),
-            "model_type": "efficientnet_b0",
-            "num_classes": 2,
-            "categories": ["non_fundus", "fundus"],
-        }, path)
+        torch.save(
+            {
+                "model_state_dict": self.state_dict(),
+                "model_type": "efficientnet_b0",
+                "num_classes": 2,
+                "categories": ["non_fundus", "fundus"],
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path, freeze_backbone=False):
@@ -126,6 +133,7 @@ class FundusClassifier(nn.Module):
 
         Returns:
             FundusClassifier instance
+
         """
         checkpoint = torch.load(path, map_location="cpu", weights_only=False)
         model = cls(num_classes=2, freeze_backbone=freeze_backbone)
@@ -149,9 +157,10 @@ def prepare_fundus_training_data(fundus_dir, non_fundus_dirs, output_dir):
         fundus_dir: directory containing fundus images
         non_fundus_dirs: list of directories with non-fundus images
         output_dir: output directory for organized data
+
     """
-    import shutil
     import random
+    import shutil
 
     os.makedirs(os.path.join(output_dir, "train", "fundus"), exist_ok=True)
     os.makedirs(os.path.join(output_dir, "train", "non_fundus"), exist_ok=True)
@@ -190,10 +199,14 @@ def prepare_fundus_training_data(fundus_dir, non_fundus_dirs, output_dir):
             dst = os.path.join(output_dir, "val", label, f"{label}_{i:04d}.png")
             shutil.copy2(src, dst)
 
-    print(f"Fundus: {len(fundus_images)} images "
-          f"({len(fundus_images)//5} train, {len(fundus_images) - len(fundus_images)//5} val)")
-    print(f"Non-fundus: {len(non_fundus_images)} images "
-          f"({len(non_fundus_images)//5} train, {len(non_fundus_images) - len(non_fundus_images)//5} val)")
+    print(
+        f"Fundus: {len(fundus_images)} images "
+        f"({len(fundus_images) // 5} train, {len(fundus_images) - len(fundus_images) // 5} val)"
+    )
+    print(
+        f"Non-fundus: {len(non_fundus_images)} images "
+        f"({len(non_fundus_images) // 5} train, {len(non_fundus_images) - len(non_fundus_images) // 5} val)"
+    )
 
 
 def train_fundus_classifier(data_dir, output_path, epochs=10, lr=0.001, batch_size=16):
@@ -208,25 +221,30 @@ def train_fundus_classifier(data_dir, output_path, epochs=10, lr=0.001, batch_si
 
     Returns:
         dict with training history
+
     """
     from torch.utils.data import DataLoader
     from torchvision.datasets import ImageFolder
 
     # Data loading
-    train_transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.RandomCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    train_transform = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.RandomCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
 
-    val_transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    val_transform = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
 
     train_dataset = ImageFolder(os.path.join(data_dir, "train"), transform=train_transform)
     val_dataset = ImageFolder(os.path.join(data_dir, "val"), transform=val_transform)
@@ -295,9 +313,11 @@ def train_fundus_classifier(data_dir, output_path, epochs=10, lr=0.001, batch_si
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
 
-        print(f"Epoch {epoch+1}/{epochs}: "
-              f"train_loss={train_loss:.4f}, train_acc={train_acc:.4f}, "
-              f"val_loss={val_loss:.4f}, val_acc={val_acc:.4f}")
+        print(
+            f"Epoch {epoch + 1}/{epochs}: "
+            f"train_loss={train_loss:.4f}, train_acc={train_acc:.4f}, "
+            f"val_loss={val_loss:.4f}, val_acc={val_acc:.4f}"
+        )
 
     # Save
     model.save(output_path)

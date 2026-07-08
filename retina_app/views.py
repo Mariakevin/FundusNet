@@ -1,29 +1,27 @@
-"""
-Views for FundusNet — single-page screening tool.
-"""
+"""Views for FundusNet — single-page screening tool."""
 
-import os
-import mimetypes
 import logging
-from django.http import HttpRequest, HttpResponse, FileResponse, Http404
-from django.shortcuts import render
+import mimetypes
+import os
+
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.shortcuts import render
 
-from .forms import ImageUploadForm
-from .models import UploadedImage
 from .constants import CATEGORIES
-from .services.inference import predict_image
+from .forms import ImageUploadForm
 from .services.exceptions import (
-    InferenceError,
-    ImageValidationError,
     ImageCorruptError,
-    ImageSizeError,
     ImageDimensionError,
+    ImageSizeError,
+    ImageValidationError,
+    InferenceError,
     ModelLoadError,
-    PreprocessingError,
     NotAFundusImageError,
+    PreprocessingError,
 )
+from .services.inference import predict_image
 
 logger = logging.getLogger("retina_app")
 
@@ -74,11 +72,15 @@ def index_view(request: HttpRequest) -> HttpResponse:
         else:
             error_message = "Invalid image. Please select a JPG or PNG file under 10MB."
 
-    return render(request, "index.html", {
-        "result": result,
-        "error_message": error_message,
-        "image_url": image_url,
-    })
+    return render(
+        request,
+        "index.html",
+        {
+            "result": result,
+            "error_message": error_message,
+            "image_url": image_url,
+        },
+    )
 
 
 def protected_media(request: HttpRequest, path: str) -> HttpResponse:

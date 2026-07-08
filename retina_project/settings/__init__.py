@@ -1,7 +1,7 @@
-"""
-Django settings package.
+"""Django settings package.
 Defaults to development settings unless DJANGO_SETTINGS_MODULE is set.
 """
+
 import os
 
 # Default to dev settings unless specified otherwise

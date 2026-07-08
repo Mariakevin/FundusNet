@@ -4,11 +4,12 @@ Replaces hand-tuned CLASS_PERFORMANCE_WEIGHTS with optimization-based
 per-class per-model weights learned from validation data.
 """
 
+import json
 import os
 import sys
-import json
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from scipy.optimize import minimize
 from sklearn.model_selection import StratifiedKFold
 
@@ -16,13 +17,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
-from evaluation.metrics import overall_metrics
 from evaluation.evaluate import load_dataset
-from retina_app.constants import CATEGORIES, MODEL_LIST, MODEL_WEIGHTS
-from retina_app.services.model_manager import get_model_manager
+from evaluation.metrics import overall_metrics
+from retina_app.constants import CATEGORIES, MODEL_LIST
 from retina_app.services.ensemble import _predict_single_model
+from retina_app.services.model_manager import get_model_manager
 
 
 def collect_model_predictions(models, file_paths, model_names):
@@ -31,6 +33,7 @@ def collect_model_predictions(models, file_paths, model_names):
     Returns:
         preds_per_model: dict {model_name: (n_samples, n_classes) array}
         valid_mask: boolean array of samples where all models succeeded
+
     """
     all_preds = {name: [] for name in model_names}
     valid_indices = []
@@ -77,6 +80,7 @@ def learn_class_weights(preds_per_model, labels, model_names, n_classes):
 
     Returns:
         dict {model_name: weight} per-class weights, or None if optimization fails
+
     """
     n_models = len(model_names)
     n_samples = len(labels)
@@ -135,9 +139,7 @@ def learn_class_weights(preds_per_model, labels, model_names, n_classes):
 
             if result.success:
                 w_opt = result.x / result.x.sum()
-                learned_weights[c] = {
-                    name: float(w_opt[i]) for i, name in enumerate(model_names)
-                }
+                learned_weights[c] = {name: float(w_opt[i]) for i, name in enumerate(model_names)}
             else:
                 learned_weights[c] = {name: 1.0 / n_models for name in model_names}
         except Exception:
@@ -155,6 +157,7 @@ def learn_overall_weights(preds_per_model, labels, model_names):
 
     Returns:
         dict {model_name: weight}
+
     """
     n_models = len(model_names)
     model_preds = np.array([preds_per_model[name] for name in model_names])
@@ -174,8 +177,11 @@ def learn_overall_weights(preds_per_model, labels, model_names):
 
     try:
         result = minimize(
-            neg_log_likelihood, w0, method="SLSQP",
-            bounds=bounds, constraints=constraints,
+            neg_log_likelihood,
+            w0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
             options={"maxiter": 200, "ftol": 1e-12},
         )
         if result.success:
@@ -197,6 +203,7 @@ def apply_learned_weights(predictions, learned_weights_per_class, model_names):
 
     Returns:
         dict with label, confidence, probabilities
+
     """
     probs = np.zeros(len(CATEGORIES))
 
@@ -217,8 +224,7 @@ def apply_learned_weights(predictions, learned_weights_per_class, model_names):
     }
 
 
-def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
-                          output_dir=None):
+def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42, output_dir=None):
     """Run weight learning study: compare hand-tuned vs learned weights."""
     file_paths, labels, class_names = load_dataset(dataset_dir)
 
@@ -247,9 +253,7 @@ def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
         val_labels = labels[val_idx]
 
         # Collect predictions on training set
-        train_preds, train_valid = collect_model_predictions(
-            models, train_paths, model_list
-        )
+        train_preds, train_valid = collect_model_predictions(models, train_paths, model_list)
         train_labels_valid = train_labels[train_valid]
 
         if len(train_labels_valid) < 10:
@@ -257,12 +261,8 @@ def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
             continue
 
         # Learn weights on training set
-        learned_class_weights = learn_class_weights(
-            train_preds, train_labels_valid, model_list, len(CATEGORIES)
-        )
-        learned_overall = learn_overall_weights(
-            train_preds, train_labels_valid, model_list
-        )
+        learned_class_weights = learn_class_weights(train_preds, train_labels_valid, model_list, len(CATEGORIES))
+        learned_overall = learn_overall_weights(train_preds, train_labels_valid, model_list)
 
         # Evaluate on validation set
         val_preds_raw = []
@@ -293,9 +293,7 @@ def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
             for vp in val_preds_raw:
                 pred_list = list(vp.values())
                 if strat_name == "learned_per_class":
-                    result = apply_learned_weights(
-                        pred_list, learned_class_weights, model_list
-                    )
+                    result = apply_learned_weights(pred_list, learned_class_weights, model_list)
                 else:
                     # Use simple weighted average
                     probs = np.zeros(len(CATEGORIES))
@@ -308,7 +306,7 @@ def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
                 preds.append(result["label"])
 
             preds = np.array(preds)
-            val_labs = np.array(val_labels[:len(preds)])
+            val_labs = np.array(val_labels[: len(preds)])
             acc = float(np.mean(preds == val_labs))
             metrics = overall_metrics(preds, val_labs, class_names)
 
@@ -320,13 +318,15 @@ def run_weight_learning(dataset_dir, n_folds=5, model_list=None, seed=42,
 
             print(f"  {strat_name}: acc={acc:.4f}, macro_f1={metrics['macro_f1']:.4f}")
 
-        fold_results.append({
-            "strategies": strategy_results,
-            "learned_class_weights": learned_class_weights,
-            "learned_overall_weights": learned_overall,
-            "n_train": len(train_labels_valid),
-            "n_val": len(val_labels),
-        })
+        fold_results.append(
+            {
+                "strategies": strategy_results,
+                "learned_class_weights": learned_class_weights,
+                "learned_overall_weights": learned_overall,
+                "n_train": len(train_labels_valid),
+                "n_val": len(val_labels),
+            }
+        )
 
     # Aggregate
     summary = {}
@@ -361,13 +361,12 @@ def print_weight_summary(results):
     for strat, metrics in s.items():
         acc = metrics["accuracy"]
         f1 = metrics["macro_f1"]
-        print(f"{strat:<25} "
-              f"{acc['mean']:.4f}±{acc['std']:.4f} "
-              f"{f1['mean']:.4f}±{f1['std']:.4f}")
+        print(f"{strat:<25} {acc['mean']:.4f}±{acc['std']:.4f} {f1['mean']:.4f}±{f1['std']:.4f}")
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="retina_dataset")
     parser.add_argument("--folds", type=int, default=5)

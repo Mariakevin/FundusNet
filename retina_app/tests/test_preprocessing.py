@@ -1,34 +1,28 @@
 import os
 import tempfile
-from io import BytesIO
 
-import cv2
 import numpy as np
+from django.test import TestCase
 from PIL import Image
 
-from django.test import TestCase
-
 from retina_app.constants import (
-    MIN_IMAGE_DIMENSION,
-    MAX_IMAGE_DIMENSION,
     MAX_FILE_SIZE,
-    ALLOWED_EXTENSIONS,
 )
 from retina_app.services.exceptions import ImageValidationError
 from retina_app.services.preprocessing import (
-    validate_image_file,
+    apply_adaptive_clahe,
     apply_clahe,
-    extract_green_channel,
-    enhance_fundus_image,
-    detect_fundus_roi,
+    apply_color_constancy,
     assess_image_quality,
     check_image_quality,
-    preprocess_fundus,
-    apply_adaptive_clahe,
-    reduce_noise,
-    apply_color_constancy,
+    detect_fundus_roi,
+    enhance_fundus_image,
+    extract_green_channel,
     generate_preprocessing_viz,
+    preprocess_fundus,
+    reduce_noise,
     save_preprocessing_viz,
+    validate_image_file,
 )
 
 

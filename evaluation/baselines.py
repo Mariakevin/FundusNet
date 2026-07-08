@@ -11,48 +11,43 @@ Compares different ensemble strategies on the same CV folds:
 Additionally provides published literature baselines for comparison.
 """
 
+import json
 import os
 import sys
-import json
 import time
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
-from evaluation.metrics import (
-    compute_ece,
-    compute_mce,
-    compute_brier,
-    per_class_metrics,
-    overall_metrics,
-    confusion_matrix,
-)
 from evaluation.evaluate import load_dataset
+from evaluation.metrics import (
+    compute_brier,
+    compute_ece,
+    overall_metrics,
+)
 from retina_app.constants import (
     CATEGORIES,
     MODEL_LIST,
-    MODEL_WEIGHTS,
-    CLASS_PERFORMANCE_WEIGHTS,
     UNCERTAINTY_THRESHOLD,
 )
-from retina_app.services.model_manager import get_model_manager
 from retina_app.services.ensemble import (
+    _predict_single_model,
+    detect_model_disagreement,
     ensemble_predictions,
     selective_ensemble,
-    detect_model_disagreement,
-    _predict_single_model,
 )
+from retina_app.services.model_manager import get_model_manager
 from retina_app.services.uncertainty import (
     compute_prediction_entropy,
-    mc_dropout_single_model,
 )
-
 
 # ── Published literature baselines for comparison ──────────────────────────
 # These are reference values from published papers (not computed on our data).
@@ -212,8 +207,7 @@ STRATEGIES = {
 }
 
 
-def run_baseline_comparison(dataset_dir, n_folds=5, model_list=None, seed=42,
-                             output_dir=None, learned_weights=None):
+def run_baseline_comparison(dataset_dir, n_folds=5, model_list=None, seed=42, output_dir=None, learned_weights=None):
     """Compare all baseline strategies on same CV folds."""
     file_paths, labels, class_names = load_dataset(dataset_dir)
     n_classes = len(class_names)
@@ -302,9 +296,11 @@ def run_baseline_comparison(dataset_dir, n_folds=5, model_list=None, seed=42,
             }
 
             all_results[strategy_name]["folds"].append(fold_result)
-            print(f"  {strategy_name}: acc={accuracy:.4f}, "
-                  f"refused={n_refused}/{len(val_labels)}, "
-                  f"ECE={fold_result['ece']:.4f}")
+            print(
+                f"  {strategy_name}: acc={accuracy:.4f}, "
+                f"refused={n_refused}/{len(val_labels)}, "
+                f"ECE={fold_result['ece']:.4f}"
+            )
 
     summary = {}
     for strategy_name, data in all_results.items():
@@ -361,11 +357,13 @@ def print_baseline_summary(results):
         ref = metrics["refusal_rate"]
         ece = metrics["ece"]
         lat = metrics["mean_latency_ms"]
-        print(f"{strategy:<20} "
-              f"{acc['mean']:.4f}±{acc['std']:.4f} "
-              f"{ref['mean']:.2%}±{ref['std']:.2%} "
-              f"{ece['mean']:.4f}±{ece['std']:.4f} "
-              f"{lat['mean']:.1f}±{lat['std']:.1f}ms")
+        print(
+            f"{strategy:<20} "
+            f"{acc['mean']:.4f}±{acc['std']:.4f} "
+            f"{ref['mean']:.2%}±{ref['std']:.2%} "
+            f"{ece['mean']:.4f}±{ece['std']:.4f} "
+            f"{lat['mean']:.1f}±{lat['std']:.1f}ms"
+        )
 
     # Literature baselines
     if "literature_baselines" in results:
@@ -375,15 +373,12 @@ def print_baseline_summary(results):
         print(f"{'Method':<35} {'Accuracy':>10} {'AUROC':>10} {'F1':>10} {'Dataset':<15}")
         print("-" * 90)
         for name, info in results["literature_baselines"].items():
-            print(f"{name:<35} "
-                  f"{info['accuracy']:.4f} "
-                  f"{info['auroc']:.4f} "
-                  f"{info['f1']:.4f} "
-                  f"{info['dataset']:<15}")
+            print(f"{name:<35} {info['accuracy']:.4f} {info['auroc']:.4f} {info['f1']:.4f} {info['dataset']:<15}")
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="retina_dataset")
     parser.add_argument("--folds", type=int, default=5)

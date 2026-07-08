@@ -1,9 +1,9 @@
 from django.test import TestCase
+
 from retina_app.services.model_manager import (
     ModelHealthTracker,
     get_health_tracker,
 )
-from retina_app.constants import MODEL_HEALTH_WINDOW, MODEL_HEALTH_MIN_ACCURACY
 
 
 class ModelHealthTrackerTest(TestCase):

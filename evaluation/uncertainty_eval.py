@@ -5,44 +5,38 @@ generates reliability diagrams, accuracy-refusal tradeoff curves, and
 compares different uncertainty signals.
 """
 
+import json
 import os
 import sys
-import json
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from sklearn.model_selection import StratifiedKFold
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "retina_project.settings")
 
 import django
+
 django.setup()
 
+from evaluation.evaluate import evaluate_ensemble, load_dataset
 from evaluation.metrics import (
-    compute_ece,
-    compute_reliability_data,
     compute_error_detection_auroc,
+    compute_reliability_data,
 )
-from evaluation.evaluate import load_dataset, evaluate_ensemble
 from retina_app.constants import (
-    CATEGORIES,
+    MC_DROPOUT_PASSES,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    MC_DROPOUT_PASSES,
-    UNCERTAINTY_THRESHOLD,
 )
-from retina_app.services.model_manager import get_model_manager
 from retina_app.services.ensemble import (
     _predict_single_model,
     detect_model_disagreement,
-    ensemble_predictions,
 )
+from retina_app.services.model_manager import get_model_manager
 from retina_app.services.uncertainty import (
     mc_dropout_single_model,
-    compute_prediction_entropy,
-    compute_entropy,
-    _enable_dropout,
-    _disable_dropout,
 )
 
 
@@ -52,6 +46,7 @@ def collect_uncertainty_data(models, file_paths, labels, model_weights, n_passes
     Returns:
         dict with arrays: predictions, labels, softmax_confidence,
         mc_entropy, ensemble_disagreement, probs
+
     """
     results = {
         "predictions": [],
@@ -69,8 +64,11 @@ def collect_uncertainty_data(models, file_paths, labels, model_weights, n_passes
 
         # Get ensemble prediction
         ensemble_result = evaluate_ensemble(
-            models, path, model_weights=model_weights,
-            use_tta=False, use_selective=False,
+            models,
+            path,
+            model_weights=model_weights,
+            use_tta=False,
+            use_selective=False,
         )
 
         if ensemble_result is None:
@@ -87,9 +85,7 @@ def collect_uncertainty_data(models, file_paths, labels, model_weights, n_passes
         for name in model_weights:
             if name in models:
                 try:
-                    mc_result = mc_dropout_single_model(
-                        models[name], path, n_passes=n_passes
-                    )
+                    mc_result = mc_dropout_single_model(models[name], path, n_passes=n_passes)
                     if mc_result is not None:
                         mc_ent = mc_result.get("entropy", 0.0)
                         break
@@ -134,6 +130,7 @@ def evaluate_uncertainty_signals(data):
 
     Returns:
         dict with AUROC per signal and reliability data
+
     """
     is_correct = data["is_correct"]
     n_correct = int(np.sum(is_correct))
@@ -170,25 +167,31 @@ def evaluate_uncertainty_signals(data):
     # Threshold sweep for MC Dropout entropy
     if np.std(data["mc_entropy"]) > 0:
         results["threshold_sweep"]["mc_entropy"] = sweep_thresholds(
-            data["mc_entropy"], is_correct, data["predictions"], data["labels"],
+            data["mc_entropy"],
+            is_correct,
+            data["predictions"],
+            data["labels"],
             lower_is_uncertain=False,
         )
 
     if np.std(data["ensemble_disagreement"]) > 0:
         results["threshold_sweep"]["ensemble_disagreement"] = sweep_thresholds(
-            data["ensemble_disagreement"], is_correct, data["predictions"], data["labels"],
+            data["ensemble_disagreement"],
+            is_correct,
+            data["predictions"],
+            data["labels"],
             lower_is_uncertain=False,
         )
 
     return results
 
 
-def sweep_thresholds(signal_values, is_correct, predictions, labels,
-                      lower_is_uncertain=False, n_steps=30):
+def sweep_thresholds(signal_values, is_correct, predictions, labels, lower_is_uncertain=False, n_steps=30):
     """Sweep uncertainty thresholds and compute accuracy-refusal tradeoff.
 
     Returns:
         list of {threshold, accuracy, refusal_rate, n_kept}
+
     """
     min_val = float(np.min(signal_values))
     max_val = float(np.max(signal_values))
@@ -213,12 +216,14 @@ def sweep_thresholds(signal_values, is_correct, predictions, labels,
         else:
             acc = 0.0
 
-        results.append({
-            "threshold": float(threshold),
-            "accuracy": acc,
-            "refusal_rate": refusal_rate,
-            "n_kept": n_kept,
-        })
+        results.append(
+            {
+                "threshold": float(threshold),
+                "accuracy": acc,
+                "refusal_rate": refusal_rate,
+                "n_kept": n_kept,
+            }
+        )
 
     return results
 
@@ -228,9 +233,9 @@ def find_optimal_threshold(sweep_data, min_refusal=0.0, max_refusal=0.5):
 
     Returns:
         dict with optimal threshold, accuracy, refusal_rate
+
     """
-    valid = [d for d in sweep_data
-             if min_refusal <= d["refusal_rate"] <= max_refusal and d["n_kept"] > 0]
+    valid = [d for d in sweep_data if min_refusal <= d["refusal_rate"] <= max_refusal and d["n_kept"] > 0]
 
     if not valid:
         return None
@@ -239,8 +244,7 @@ def find_optimal_threshold(sweep_data, min_refusal=0.0, max_refusal=0.5):
     return best
 
 
-def run_uncertainty_study(dataset_dir, n_folds=5, model_list=None, seed=42,
-                           output_dir=None):
+def run_uncertainty_study(dataset_dir, n_folds=5, model_list=None, seed=42, output_dir=None):
     """Run full uncertainty calibration study."""
     file_paths, labels, class_names = load_dataset(dataset_dir)
 
@@ -268,9 +272,7 @@ def run_uncertainty_study(dataset_dir, n_folds=5, model_list=None, seed=42,
         val_paths = [file_paths[i] for i in val_idx]
         val_labels = labels[val_idx]
 
-        data = collect_uncertainty_data(
-            models, val_paths, val_labels, model_weights, n_passes=MC_DROPOUT_PASSES
-        )
+        data = collect_uncertainty_data(models, val_paths, val_labels, model_weights, n_passes=MC_DROPOUT_PASSES)
 
         if len(data["predictions"]) < 10:
             print("  Too few valid predictions, skipping fold")
@@ -345,13 +347,16 @@ def print_uncertainty_summary(results):
 
     print("\nOptimal Thresholds:")
     for signal, opt in s.get("optimal_thresholds", {}).items():
-        print(f"  {signal}: threshold={opt['threshold']:.4f}, "
-              f"accuracy={opt['accuracy']:.4f}, "
-              f"refusal_rate={opt['refusal_rate']:.2%}")
+        print(
+            f"  {signal}: threshold={opt['threshold']:.4f}, "
+            f"accuracy={opt['accuracy']:.4f}, "
+            f"refusal_rate={opt['refusal_rate']:.2%}"
+        )
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="retina_dataset")
     parser.add_argument("--folds", type=int, default=5)
