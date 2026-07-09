@@ -143,7 +143,27 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
     elif dark_ratio > 0.2:
         surround_score = (dark_ratio - 0.2) / 0.4 * 0.5
 
-    # Score based on circularity, convexity, area ratio, and dark surround
+    # --- Corner darkness check ---
+    # Fundus images ALWAYS have at least 3 dark corners because the
+    # circular field of view is smaller than the camera sensor.
+    # Non-fundus images (landscapes, objects, screenshots) fill the
+    # frame and have 0-1 dark corners.
+    # A corner is "dark" if the mean pixel value in a small kernel
+    # at the corner is below a threshold (Otsu's own threshold
+    # for the image).
+    corner_size = max(8, min(h, w) // 20)
+    otsu_thresh, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    corners = [
+        gray[:corner_size, :corner_size],                   # top-left
+        gray[:corner_size, -corner_size:],                  # top-right
+        gray[-corner_size:, :corner_size],                  # bottom-left
+        gray[-corner_size:, -corner_size:],                 # bottom-right
+    ]
+    dark_corners = sum(1 for c in corners if np.mean(c) < otsu_thresh * 0.85)
+    corner_score = dark_corners / 4.0  # 0.0 → 1.0
+
+    # Score based on circularity, convexity, area ratio, dark surround, and corner darkness
     circ_score = 0.0
     if circularity >= FUNDUS_CIRCULARITY_MIN:
         circ_score = min(1.0, circularity / 0.8)
@@ -156,7 +176,7 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
         dist_from_ideal = abs(area_ratio - 0.55)
         area_score = max(0.0, 1.0 - dist_from_ideal / 0.40)
 
-    return 0.30 * circ_score + 0.25 * convex_score + 0.20 * area_score + 0.25 * surround_score
+    return 0.25 * circ_score + 0.20 * convex_score + 0.15 * area_score + 0.20 * surround_score + 0.20 * corner_score
 
 
 def _check_edge_density(image: np.ndarray, gray: np.ndarray = None) -> float:
@@ -217,6 +237,57 @@ def _check_green_channel(image: np.ndarray) -> float:
         return 0.3 + 0.7 * (std_dev - FUNDUS_GREEN_CH_MIN_STD) / (20 - FUNDUS_GREEN_CH_MIN_STD)
     elif 60 < std_dev <= 80:
         return 0.5 * (1.0 - (std_dev - 60) / 20)
+    else:
+        return 0.0
+
+
+def _check_channel_ratio(image: np.ndarray) -> float:
+    """Check red-to-green channel ratio for fundus-like characteristics.
+
+    In fundus images, the red channel (retinal surface illumination) is
+    consistently brighter than the green channel (blood vessel contrast).
+    Natural scenes and object photos often have green as bright or brighter
+    than red.
+
+    Fundus:  red_mean / green_mean typically 1.4–3.0
+    Natural: red_mean / green_mean typically 0.7–1.3
+
+    Returns score 0.0-1.0 (1.0 = strong fundus channel relationship).
+    """
+    r = image[:, :, 0].astype(np.float32)
+    g = image[:, :, 1].astype(np.float32)
+
+    # Central region weight: fundus structures are in the center
+    h, w = image.shape[:2]
+    center_y, center_x = h // 2, w // 2
+    radius = min(h, w) // 3
+    yy, xx = np.ogrid[:h, :w]
+    center_mask = ((yy - center_y) ** 2 + (xx - center_x) ** 2) <= radius ** 2
+
+    r_center = r[center_mask].mean()
+    g_center = g[center_mask].mean()
+
+    r_full = r.mean()
+    g_full = g.mean()
+
+    # Blend: 60% center, 40% full
+    r_mean = 0.6 * r_center + 0.4 * r_full
+    g_mean = 0.6 * g_center + 0.4 * g_full
+
+    if g_mean < 1.0:
+        return 0.0
+
+    ratio = r_mean / g_mean
+
+    # Fundus: ratio 1.4–3.0, peak at ~1.8–2.2
+    if 1.4 <= ratio <= 3.0:
+        ideal = 2.0
+        dist = abs(ratio - ideal)
+        return max(0.3, 1.0 - dist / 1.2)
+    elif 1.1 <= ratio < 1.4:
+        return 0.2 + 0.8 * (ratio - 1.1) / 0.3
+    elif 3.0 < ratio <= 3.5:
+        return 0.5 * (1.0 - (ratio - 3.0) / 0.5)
     else:
         return 0.0
 
@@ -322,6 +393,7 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
     circular_score = _check_circular_region(image, gray=gray)
     edge_score = _check_edge_density(image, gray=gray)
     green_score = _check_green_channel(image)
+    channel_ratio_score = _check_channel_ratio(image)
     texture_score = _check_texture_regularity(image, gray=gray)
 
     signals = {
@@ -329,14 +401,20 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
         "circular_region": round(circular_score, 4),
         "edge_density": round(edge_score, 4),
         "green_channel": round(green_score, 4),
+        "channel_ratio": round(channel_ratio_score, 4),
         "texture_regularity": round(texture_score, 4),
     }
 
-    # Weighted combination — 5 signals
-    # texture_regularity gets high weight because it's the strongest
-    # discriminator between text/documents and fundus images.
+    # Weighted combination — 6 signals
+    # channel_ratio and texture_regularity get high weight because they
+    # are the strongest discriminators between fundus and non-fundus images.
     combined_score = (
-        color_score * 0.25 + circular_score * 0.20 + edge_score * 0.15 + green_score * 0.10 + texture_score * 0.30
+        color_score * 0.20
+        + circular_score * 0.20
+        + edge_score * 0.10
+        + green_score * 0.08
+        + channel_ratio_score * 0.20
+        + texture_score * 0.22
     )
 
     # Second gate: require color signal to be decent.
@@ -344,13 +422,13 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
     # the image lacks the most fundamental fundus characteristic, regardless
     # of how other signals score. This catches clean UIs and minimal images
     # that pass on edge/texture alone.
-    has_fundus_color = color_score >= 0.20
+    has_fundus_color = color_score >= 0.25
 
     # Third gate: require circular structure.
     # A fundus image ALWAYS has a bright circular field of view with a dark
     # surround from the camera aperture. Faces, landscapes, and other organic
     # images lack this and must be rejected.
-    has_circular_structure = circular_score >= 0.30
+    has_circular_structure = circular_score >= 0.35
 
     # Determine which gate failed (for messaging)
     gate_failures = []
@@ -369,14 +447,16 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
         weak_signals = []
         if color_score < 0.3:
             weak_signals.append("color pattern")
-        if circular_score < 0.2:
+        if circular_score < 0.3:
             weak_signals.append("circular structure")
-        elif circular_score < 0.3:
+        elif circular_score < 0.4:
             weak_signals.append("weak circular structure")
         if edge_score < 0.3:
             weak_signals.append("texture patterns")
         if green_score < 0.3:
             weak_signals.append("retinal features")
+        if channel_ratio_score < 0.3:
+            weak_signals.append("channel contrast")
         if texture_score < 0.3:
             weak_signals.append("document/text detected")
 

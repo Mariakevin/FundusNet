@@ -99,7 +99,7 @@ GRADCAM_COLORMAP = "jet"  # OpenCV colormap for heatmap
 
 # --- Fundus Image Validation ---
 FUNDUS_VALIDATION_ENABLED = True
-FUNDUS_VALIDATION_THRESHOLD = 0.55  # Minimum combined score to accept as fundus
+FUNDUS_VALIDATION_THRESHOLD = 0.60  # Minimum combined score to accept as fundus
 FUNDUS_COLOR_MIN_RATIO = 0.35  # Minimum % of pixels in fundus color range (red-orange)
 FUNDUS_CIRCULARITY_MIN = 0.3  # Minimum circularity score for bright region
 FUNDUS_AREA_MIN_RATIO = 0.20  # Minimum bright region area ratio

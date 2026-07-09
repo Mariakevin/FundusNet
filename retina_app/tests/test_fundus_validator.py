@@ -321,13 +321,14 @@ class ValidateFundusImageTest(TestCase):
         result = validate_fundus_image(path)
         s = result["signals"]
         expected = (
-            s["color_distribution"] * 0.25
+            s["color_distribution"] * 0.20
             + s["circular_region"] * 0.20
-            + s["edge_density"] * 0.15
-            + s["green_channel"] * 0.10
-            + s["texture_regularity"] * 0.30
+            + s["edge_density"] * 0.10
+            + s["green_channel"] * 0.08
+            + s["channel_ratio"] * 0.20
+            + s["texture_regularity"] * 0.22
         )
-        # Account for the has_fundus_color gate — if color_score < 0.20,
+        # Account for the has_fundus_color gate — if color_score < 0.25,
         # is_fundus is forced False regardless of combined score
         self.assertAlmostEqual(result["confidence"], round(expected, 4), places=3)
 
