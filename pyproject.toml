@@ -23,7 +23,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501"]
+ignore = ["E501", "N812", "N806", "N802", "E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"train.py" = ["E402"]
+"distill.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -23,37 +23,39 @@ logger = logging.getLogger("retina_app")
 
 # Map model types to their last convolutional layer names
 GRADCAM_TARGET_LAYERS = {
-    "resnet": "layer4",
-    "efficientnet": "features",
-    "mobilenet": "features",
-    "squeezenet": "features",
-    "convnext": "features",
-    "vit": "encoder",
+    "swin": "features",
+    "maxvit": "stages",
+    "convnext_v2": "features",
+    "efficientnet_v2": "features",
+    "deit": "encoder",
 }
 
 
 def _get_target_layer(model: nn.Module, model_type: str) -> nn.Module:
     """Get the target layer for Grad-CAM based on model architecture."""
-    if model_type == "resnet":
-        return model.layer4
-    elif model_type == "efficientnet":
-        return model.features[-1]
-    elif model_type == "mobilenet":
-        return model.features[-1]
-    elif model_type == "squeezenet":
-        return model.features[12]
-    elif model_type == "convnext":
-        return model.features[-1]
-    elif model_type == "vit":
-        return model.encoder
-    else:
+    if model_type == "swin":
+        # Swin Transformer has hierarchical features
         if hasattr(model, "features"):
             return model.features[-1]
-        elif hasattr(model, "encoder"):
+    elif model_type == "maxvit":
+        # MaxViT has stages containing attention blocks
+        if hasattr(model, "stages"):
+            return model.stages[-1]
+    elif model_type in ("convnext_v2", "efficientnet_v2"):
+        if hasattr(model, "features"):
+            return model.features[-1]
+    elif model_type == "deit":
+        if hasattr(model, "encoder"):
             return model.encoder
-        elif hasattr(model, "layer4"):
-            return model.layer4
-        return next(model.modules())
+
+    # Fallback: auto-detect
+    if hasattr(model, "features"):
+        return model.features[-1]
+    elif hasattr(model, "encoder"):
+        return model.encoder
+    elif hasattr(model, "layer4"):
+        return model.layer4
+    return next(model.modules())
 
 
 class GradCAM:

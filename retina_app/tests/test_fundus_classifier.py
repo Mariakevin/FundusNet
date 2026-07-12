@@ -116,18 +116,3 @@ class TestFundusClassifierSaveLoad(SimpleTestCase):
             loaded.eval()
             # Should be in eval mode
             self.assertFalse(loaded.backbone.training)
-
-
-class TestFundusClassifierConstants(SimpleTestCase):
-    """Test that constants are properly configured."""
-
-    def test_constants_exist(self):
-        from retina_app.constants import (
-            FUNDUS_LEARNED_MODEL_PATH,
-            FUNDUS_LEARNED_THRESHOLD,
-            FUNDUS_LEARNED_VALIDATOR_ENABLED,
-        )
-
-        self.assertIsInstance(FUNDUS_LEARNED_VALIDATOR_ENABLED, bool)
-        self.assertIsInstance(FUNDUS_LEARNED_MODEL_PATH, str)
-        self.assertIsInstance(FUNDUS_LEARNED_THRESHOLD, float)

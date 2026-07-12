@@ -66,6 +66,27 @@
       </div>
     </div>
   </div>
+
+  <section class="retina-how" aria-label="How it works">
+    <h2 class="retina-how-title">How It Works</h2>
+    <div class="retina-how-grid">
+      <div class="retina-how-step">
+        <div class="retina-how-number">1</div>
+        <h3 class="retina-how-step-title">Upload</h3>
+        <p class="retina-how-step-desc">Drag and drop or select a retinal fundus photograph. JPG and PNG formats accepted.</p>
+      </div>
+      <div class="retina-how-step">
+        <div class="retina-how-number">2</div>
+        <h3 class="retina-how-step-title">Analyze</h3>
+        <p class="retina-how-step-desc">A 5-model ensemble processes the image with test-time augmentation and uncertainty estimation.</p>
+      </div>
+      <div class="retina-how-step">
+        <div class="retina-how-number">3</div>
+        <h3 class="retina-how-step-title">Review</h3>
+        <p class="retina-how-step-desc">View the classification, confidence score, and Grad-CAM heatmap showing which regions influenced the decision.</p>
+      </div>
+    </div>
+  </section>
   {% endif %}
 
   {% if result %}
@@ -142,7 +163,7 @@
         <div class="retina-prob">
           <span class="retina-prob-label {% if label == result.prediction %}retina-prob-label-active{% endif %}">{{ label }}</span>
           <div class="retina-prob-bar">
-            <div class="retina-prob-fill {% if label == result.prediction %}retina-prob-fill-active{% endif %}" role="progressbar" aria-valuenow="{{ prob|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ label }} probability" style="width:{{ prob }}%;"></div>
+            <div class="retina-prob-fill {% if label == result.prediction %}retina-prob-fill-active{% endif %}" role="progressbar" aria-valuenow="{{ prob|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ label }} probability" data-width="{{ prob }}"></div>
           </div>
           <span class="retina-prob-value">{{ prob|floatformat:1 }}%</span>
         </div>
@@ -172,7 +193,7 @@
       </h3>
       <div class="retina-viz">
         <img src="{{ result.preprocessing_viz_url }}" alt="Preprocessing pipeline visualization showing CLAHE, noise reduction, and color constancy" class="retina-viz-img" loading="lazy">
-        <p class="retina-viz-caption">Adaptive CLAHE, noise reduction, and color constancy applied before analysis.</p>
+        <p class="retina-viz-caption">Adaptive CLAHE and green-channel enhancement applied before analysis.</p>
       </div>
     </div>
     {% endif %}
@@ -193,6 +214,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  /* ── Upload handling ── */
   var fileInput = document.getElementById('id_image');
   var zone = document.getElementById('dropzone');
   var preview = document.getElementById('preview-container');
@@ -200,54 +222,68 @@ document.addEventListener('DOMContentLoaded', function() {
   var imgPreview = document.getElementById('image-preview');
   var submitBtn = document.getElementById('submit-btn');
 
-  if (!fileInput) return;
+  if (fileInput) {
+    var MAX_SIZE = 10 * 1024 * 1024;
+    var ALLOWED = ['image/jpeg', 'image/png'];
 
-  var MAX_SIZE = 10 * 1024 * 1024;
-  var ALLOWED = ['image/jpeg', 'image/png'];
-
-  function validateFile(file) {
-    if (!file) return false;
-    if (ALLOWED.indexOf(file.type) === -1) return false;
-    if (file.size > MAX_SIZE) return false;
-    return true;
-  }
-
-  function handleFile(file) {
-    if (!validateFile(file)) return;
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      imgPreview.src = e.target.result;
-      placeholder.style.display = 'none';
-      preview.classList.remove('hidden');
-      submitBtn.disabled = false;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
-
-  zone.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    zone.classList.add('retina-dropzone-over');
-  });
-  zone.addEventListener('dragleave', function(e) {
-    e.preventDefault();
-    zone.classList.remove('retina-dropzone-over');
-  });
-  zone.addEventListener('drop', function(e) {
-    e.preventDefault();
-    zone.classList.remove('retina-dropzone-over');
-    var file = e.dataTransfer.files[0];
-    if (file) {
-      fileInput.files = e.dataTransfer.files;
-      handleFile(file);
+    function validateFile(file) {
+      if (!file) return false;
+      if (ALLOWED.indexOf(file.type) === -1) return false;
+      if (file.size > MAX_SIZE) return false;
+      return true;
     }
-  });
 
-  document.getElementById('upload-form').addEventListener('submit', function() {
-    submitBtn.disabled = true;
-    submitBtn.classList.add('retina-btn-loading');
-  });
+    function handleFile(file) {
+      if (!validateFile(file)) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        imgPreview.src = e.target.result;
+        placeholder.style.display = 'none';
+        preview.classList.remove('hidden');
+        submitBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    fileInput.addEventListener('change', function(e) { handleFile(e.target.files[0]); });
+
+    zone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      zone.classList.add('retina-dropzone-over');
+    });
+    zone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      zone.classList.remove('retina-dropzone-over');
+    });
+    zone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      zone.classList.remove('retina-dropzone-over');
+      var file = e.dataTransfer.files[0];
+      if (file) {
+        fileInput.files = e.dataTransfer.files;
+        handleFile(file);
+      }
+    });
+
+    document.getElementById('upload-form').addEventListener('submit', function() {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('retina-btn-loading');
+    });
+  }
+
+  /* ── Animate probability bars on result page ── */
+  var bars = document.querySelectorAll('.retina-prob-fill');
+  if (bars.length) {
+    setTimeout(function() {
+      for (var i = 0; i < bars.length; i++) {
+        var width = bars[i].getAttribute('data-width');
+        if (width) {
+          bars[i].style.setProperty('--target-width', width + '%');
+          bars[i].classList.add('retina-prob-fill-animated');
+        }
+      }
+    }, 300);
+  }
 });
 </script>
 {% endblock %}

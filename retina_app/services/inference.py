@@ -18,9 +18,7 @@ from django.conf import settings as django_settings
 from PIL import Image
 
 from retina_app.constants import (
-    ADAPTIVE_CLAHE_ENABLED,
     CATEGORIES,
-    COLOR_CONSTANCY_ENABLED,
     CONFIDENCE_THRESHOLD_HIGH,
     CONFIDENCE_THRESHOLD_LOW,
     CONFIDENCE_THRESHOLD_REFUSE,
@@ -32,9 +30,7 @@ from retina_app.constants import (
     MAX_WORKERS,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    NOISE_REDUCTION_ENABLED,
     OOD_ENTROPY_THRESHOLD,
-    PREPROCESSING_VIZ_ENABLED,
     UNCERTAINTY_REFUSAL_MESSAGE,
 )
 from retina_app.services.ensemble import (
@@ -63,14 +59,9 @@ from retina_app.services.model_manager import (
     get_model_manager,
 )
 from retina_app.services.preprocessing import (
-    apply_adaptive_clahe,
     apply_clahe,
-    apply_color_constancy,
     check_image_quality,
-    generate_preprocessing_viz,
     preprocess_fundus,
-    reduce_noise,
-    save_preprocessing_viz,
     validate_image_file,
 )
 
@@ -149,14 +140,7 @@ def predict_image(
     if use_clahe:
         try:
             preprocessed = preprocess_fundus(image_path, enhance=False, detect_roi=False)
-            if ADAPTIVE_CLAHE_ENABLED:
-                preprocessed = apply_adaptive_clahe(preprocessed)
-            else:
-                preprocessed = apply_clahe(preprocessed)
-            if NOISE_REDUCTION_ENABLED:
-                preprocessed = reduce_noise(preprocessed)
-            if COLOR_CONSTANCY_ENABLED:
-                preprocessed = apply_color_constancy(preprocessed)
+            preprocessed = apply_clahe(preprocessed)
             ext = os.path.splitext(image_path)[1]
             img_hash = _get_image_hash(image_path)
             tmp_dir = tempfile.gettempdir()
@@ -314,7 +298,6 @@ def predict_image(
         if not is_refused and use_ensemble:
             probs = final_result.get("probabilities")
             if probs and len(probs) > 1:
-                import numpy as np
                 from scipy.stats import entropy as scipy_entropy
 
                 norm_entropy = scipy_entropy(probs) / np.log(len(probs))
@@ -339,8 +322,7 @@ def predict_image(
                     confidence = 0.0
                     confidence_warning = "low"
                     logger.warning(
-                        f"Classification refused: top-1/top-2 margin {margin:.2f}"
-                        f" < {FUNDUS_MIN_TOP1_TOP2_RATIO}"
+                        f"Classification refused: top-1/top-2 margin {margin:.2f} < {FUNDUS_MIN_TOP1_TOP2_RATIO}"
                     )
 
         # Energy-based OOD detection — uses raw logits (before softmax).
@@ -367,9 +349,7 @@ def predict_image(
                     final_result["label"] = "Uncertain"
                     confidence = 0.0
                     confidence_warning = "low"
-                    logger.warning(
-                        f"Classification refused: low energy score {energy_per_class:.4f}"
-                    )
+                    logger.warning(f"Classification refused: low energy score {energy_per_class:.4f}")
 
         result = {
             "label": final_result["label"],
@@ -414,21 +394,6 @@ def predict_image(
             result["refusal_message"] = UNCERTAINTY_REFUSAL_MESSAGE
         else:
             result["is_refused"] = False
-
-        # --- Preprocessing Visualization ---
-        if PREPROCESSING_VIZ_ENABLED:
-            try:
-                viz_panels = generate_preprocessing_viz(image_path)
-                viz_dir = os.path.join(django_settings.MEDIA_ROOT, "preprocessing_viz")
-                os.makedirs(viz_dir, exist_ok=True)
-                viz_filename = f"viz_{os.path.basename(image_path)}"
-                viz_path = os.path.join(viz_dir, viz_filename)
-                save_preprocessing_viz(viz_panels, viz_path)
-                viz_url = f"{django_settings.MEDIA_URL}preprocessing_viz/{viz_filename}"
-                result["preprocessing_viz_url"] = viz_url
-                logger.info("Preprocessing visualization saved: %s", viz_url)
-            except Exception as exc:
-                logger.warning("Preprocessing visualization failed: %s", exc)
 
         set_cache_entry(cache_key, result)
 

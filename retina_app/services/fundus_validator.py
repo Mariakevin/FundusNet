@@ -24,8 +24,6 @@ from retina_app.constants import (
     FUNDUS_EDGE_MAX_RATIO,
     FUNDUS_EDGE_MIN_RATIO,
     FUNDUS_GREEN_CH_MIN_STD,
-    FUNDUS_LEARNED_MODEL_PATH,
-    FUNDUS_LEARNED_VALIDATOR_ENABLED,
     FUNDUS_VALIDATION_THRESHOLD,
 )
 
@@ -155,10 +153,10 @@ def _check_circular_region(image: np.ndarray, gray: np.ndarray = None) -> float:
     otsu_thresh, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     corners = [
-        gray[:corner_size, :corner_size],                   # top-left
-        gray[:corner_size, -corner_size:],                  # top-right
-        gray[-corner_size:, :corner_size],                  # bottom-left
-        gray[-corner_size:, -corner_size:],                 # bottom-right
+        gray[:corner_size, :corner_size],  # top-left
+        gray[:corner_size, -corner_size:],  # top-right
+        gray[-corner_size:, :corner_size],  # bottom-left
+        gray[-corner_size:, -corner_size:],  # bottom-right
     ]
     dark_corners = sum(1 for c in corners if np.mean(c) < otsu_thresh * 0.85)
     corner_score = dark_corners / 4.0  # 0.0 → 1.0
@@ -262,7 +260,7 @@ def _check_channel_ratio(image: np.ndarray) -> float:
     center_y, center_x = h // 2, w // 2
     radius = min(h, w) // 3
     yy, xx = np.ogrid[:h, :w]
-    center_mask = ((yy - center_y) ** 2 + (xx - center_x) ** 2) <= radius ** 2
+    center_mask = ((yy - center_y) ** 2 + (xx - center_x) ** 2) <= radius**2
 
     r_center = r[center_mask].mean()
     g_center = g[center_mask].mean()
@@ -486,38 +484,5 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
         "signals": signals,
         "message": message,
     }
-
-    # Optional: learned classifier as second gate
-    if FUNDUS_LEARNED_VALIDATOR_ENABLED and is_fundus:
-        try:
-            import os
-
-            from retina_app.services.fundus_classifier import FundusClassifier
-
-            model_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                FUNDUS_LEARNED_MODEL_PATH,
-            )
-            if os.path.exists(model_path):
-                classifier = FundusClassifier.load(model_path)
-                from PIL import Image as PILImage
-
-                pil_img = PILImage.open(image_path).convert("RGB")
-                learned_result = classifier.predict_from_pil(pil_img)
-
-                result["learned_fundus_prob"] = learned_result["probability"]
-                result["learned_fundus_vote"] = learned_result["is_fundus"]
-
-                # Both must agree for final decision
-                if not learned_result["is_fundus"]:
-                    result["is_fundus"] = False
-                    result["message"] = (
-                        "Image passed heuristic validation but was rejected by "
-                        "learned fundus classifier (probability: "
-                        f"{learned_result['probability']:.3f}). "
-                        "Please upload a clear retinal fundus image."
-                    )
-        except Exception as e:
-            logger.debug("Learned fundus classifier unavailable: %s", e)
 
     return result

@@ -151,9 +151,9 @@ class TestClassDistribution(TestCase):
 class TestModelComparison(TestCase):
     def test_runs(self):
         metrics = {
-            "squeezenet": {"accuracy": 0.82, "macro_f1": 0.78},
-            "efficientnet": {"accuracy": 0.88, "macro_f1": 0.85},
-            "resnet": {"accuracy": 0.86, "macro_f1": 0.83},
+            "deit": {"accuracy": 0.82, "macro_f1": 0.78},
+            "efficientnet_v2": {"accuracy": 0.88, "macro_f1": 0.85},
+            "convnext_v2": {"accuracy": 0.86, "macro_f1": 0.83},
         }
         fig = plot_model_comparison(metrics)
         self.assertIsNotNone(fig)

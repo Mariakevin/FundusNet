@@ -44,8 +44,8 @@ class InferenceModelConfigTest(TestCase):
     def test_model_list_defined(self):
         from retina_app.constants import MODEL_LIST
 
-        self.assertIn("squeezenet", MODEL_LIST)
-        self.assertIn("efficientnet", MODEL_LIST)
+        self.assertIn("convnext_v2", MODEL_LIST)
+        self.assertIn("efficientnet_v2", MODEL_LIST)
 
     def test_model_weights_defined(self):
         from retina_app.constants import MODEL_WEIGHTS

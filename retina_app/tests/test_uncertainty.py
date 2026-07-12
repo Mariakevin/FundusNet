@@ -180,7 +180,7 @@ class MCDropoutEnsembleTest(SimpleTestCase):
             "n_passes": 3,
         }
         model = nn.Sequential(nn.Flatten(), nn.Linear(10, 4))
-        models = {"efficientnet": model}
+        models = {"efficientnet_v2": model}
         result = mc_dropout_ensemble(models, "test.jpg", n_passes=3)
         self.assertEqual(result["n_models"], 1)
         self.assertIn("individual_results", result)

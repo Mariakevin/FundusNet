@@ -10,41 +10,67 @@ from django.test import SimpleTestCase
 class GetTargetLayerTest(SimpleTestCase):
     """Test target layer selection for different model architectures."""
 
-    def test_resnet_target_layer(self):
+    def test_convnext_v2_target_layer(self):
         import torchvision.models as models
 
         from retina_app.services.gradcam import _get_target_layer
 
-        model = models.resnet50(weights=None)
-        layer = _get_target_layer(model, "resnet")
-        self.assertEqual(layer, model.layer4)
-
-    def test_efficientnet_target_layer(self):
-        import torchvision.models as models
-
-        from retina_app.services.gradcam import _get_target_layer
-
-        model = models.efficientnet_b0(weights=None)
-        layer = _get_target_layer(model, "efficientnet")
+        model = models.convnext_tiny(weights=None)
+        layer = _get_target_layer(model, "convnext_v2")
         self.assertEqual(layer, model.features[-1])
 
-    def test_mobilenet_target_layer(self):
+    def test_efficientnet_v2_target_layer(self):
         import torchvision.models as models
 
         from retina_app.services.gradcam import _get_target_layer
 
-        model = models.mobilenet_v3_small(weights=None)
-        layer = _get_target_layer(model, "mobilenet")
+        model = models.efficientnet_v2_s(weights=None)
+        layer = _get_target_layer(model, "efficientnet_v2")
         self.assertEqual(layer, model.features[-1])
 
-    def test_squeezenet_target_layer(self):
+    def test_deit_target_layer(self):
         import torchvision.models as models
 
         from retina_app.services.gradcam import _get_target_layer
 
-        model = models.squeezenet1_0(weights=None)
-        layer = _get_target_layer(model, "squeezenet")
-        self.assertEqual(layer, model.features[12])
+        model = models.vit_b_16(weights=None)
+        layer = _get_target_layer(model, "deit")
+        self.assertEqual(layer, model.encoder)
+
+    def test_convnext_v2_small_target_layer(self):
+        import torchvision.models as models
+
+        from retina_app.services.gradcam import _get_target_layer
+
+        model = models.convnext_small(weights=None)
+        layer = _get_target_layer(model, "convnext_v2")
+        self.assertEqual(layer, model.features[-1])
+
+    def test_maxvit_target_layer_fallback(self):
+        """Test MaxViT target layer selection (uses stages or fallback)."""
+        from retina_app.services.gradcam import _get_target_layer
+
+        class MockMaxViTModel:
+            def __init__(self):
+                self.stages = MagicMock()
+                self.features = MagicMock()
+
+        model = MockMaxViTModel()
+        layer = _get_target_layer(model, "maxvit")
+        # MaxViT should use stages if available
+        self.assertEqual(layer, model.stages[-1])
+
+    def test_swin_target_layer(self):
+        """Test Swin Transformer target layer selection."""
+        from retina_app.services.gradcam import _get_target_layer
+
+        class MockSwinModel:
+            def __init__(self):
+                self.features = MagicMock()
+
+        model = MockSwinModel()
+        layer = _get_target_layer(model, "swin")
+        self.assertEqual(layer, model.features[-1])
 
 
 class GradCAMInitTest(SimpleTestCase):
@@ -55,8 +81,8 @@ class GradCAMInitTest(SimpleTestCase):
 
         from retina_app.services.gradcam import GradCAM
 
-        model = models.resnet50(weights=None)
-        gradcam = GradCAM(model, "resnet")
+        model = models.convnext_tiny(weights=None)
+        gradcam = GradCAM(model, "convnext_v2")
         self.assertIsNotNone(gradcam._forward_handle)
         self.assertIsNotNone(gradcam._backward_handle)
         gradcam.cleanup()
@@ -117,7 +143,7 @@ class GradCAMGenerateTest(SimpleTestCase):
 
         from retina_app.services.gradcam import generate_gradcam
 
-        model = models.resnet50(weights=None)
+        model = models.efficientnet_v2_s(weights=None)
         model.eval()
 
         # Mock the full pipeline instead of running actual inference
@@ -150,7 +176,7 @@ class GradCAMGenerateTest(SimpleTestCase):
                                 result = generate_gradcam(
                                     model,
                                     "test.jpg",
-                                    "resnet",
+                                    "efficientnet_v2",
                                     output_path="/tmp/test_gradcam.png",
                                 )
                                 self.assertIn("predicted_class", result)
