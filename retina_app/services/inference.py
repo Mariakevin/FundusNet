@@ -166,9 +166,10 @@ def predict_image(
 
     cached = get_cache_entry(cache_key)
     if cached is not None:
-        cached["cached"] = True
-        cached["latency"] = time.time() - start_time
-        return cached
+        result = dict(cached)
+        result["cached"] = True
+        result["latency"] = time.time() - start_time
+        return result
 
     if use_ensemble and len(model_manager._models) < ENSEMBLE_MIN_MODELS:
         for model_type in MODEL_LIST:
@@ -177,6 +178,7 @@ def predict_image(
                 break
 
     n_models_used = 1
+    predictions = []
     try:
         if use_ensemble and len(model_manager._models) >= ENSEMBLE_MIN_MODELS:
             logger.info(
@@ -282,12 +284,14 @@ def predict_image(
             is_refused = True
             final_result["label"] = "Uncertain"
             final_result["confidence"] = 0.0
+            confidence = 0.0
             confidence_warning = "low"
             logger.warning(f"Classification refused: uncertainty={uncertainty_data['entropy']:.4f} > threshold")
         elif confidence < CONFIDENCE_THRESHOLD_REFUSE:
             is_refused = True
             final_result["label"] = "Uncertain"
             final_result["confidence"] = 0.0
+            confidence = 0.0
             confidence_warning = "low"
             logger.warning(f"Classification refused: low confidence {confidence:.2f} < {CONFIDENCE_THRESHOLD_REFUSE}")
 
@@ -363,6 +367,7 @@ def predict_image(
             "use_tta": use_tta,
             "use_clahe": use_clahe,
             "n_models": n_models_used,
+            "preprocessing_viz_url": None,
         }
 
         if confidence_warning:

@@ -129,9 +129,9 @@ def predict_single(request):
     if image_file.size > 10 * 1024 * 1024:
         return JsonResponse({"error": "File too large (max 10MB)"}, status=400)
 
-    allowed_types = ["image/jpeg", "image/png"]
+    allowed_types = ["image/jpeg", "image/png", "image/bmp", "image/webp", "image/tiff"]
     if image_file.content_type not in allowed_types:
-        return JsonResponse({"error": "Invalid file type. Use JPG or PNG."}, status=400)
+        return JsonResponse({"error": "Invalid file type. Use JPG, PNG, BMP, WEBP, or TIFF."}, status=400)
 
     # Save temp file
     ext = os.path.splitext(image_file.name)[1]
@@ -204,11 +204,20 @@ def predict_batch(request):
     if len(image_paths) > 100:
         return JsonResponse({"error": "Maximum 100 images per batch"}, status=400)
 
-    # Validate all paths exist
-    missing = [p for p in image_paths if not os.path.exists(p)]
-    if missing:
+    # Validate all paths exist and are within allowed directories
+    allowed_roots = [
+        os.path.normpath(settings.MEDIA_ROOT),
+        os.path.normpath(os.path.join(settings.BASE_DIR, "retina_dataset")),
+    ]
+
+    def _is_path_allowed(path: str) -> bool:
+        abs_path = os.path.abspath(path)
+        return any(abs_path.startswith(root) for root in allowed_roots)
+
+    invalid_paths = [p for p in image_paths if not os.path.exists(p) or not _is_path_allowed(p)]
+    if invalid_paths:
         return JsonResponse(
-            {"error": f"Files not found: {missing[:5]}"},
+            {"error": f"Invalid or restricted paths: {invalid_paths[:5]}"},
             status=400,
         )
 

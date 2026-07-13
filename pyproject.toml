@@ -23,7 +23,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501", "N812", "N806", "N802", "E402"]
+ignore = ["E501", "N812", "N806", "N802", "E402", "C408"]
 
 [tool.ruff.lint.per-file-ignores]
 "train.py" = ["E402"]

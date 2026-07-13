@@ -35,7 +35,7 @@ MODEL_VERSIONS = {
 MODEL_PATHS: dict[str, str] | None = None
 
 # Optional ONNX runtime
-_ort_session = None
+_ort_sessions: dict[str, Any] = {}
 _ort_available = False
 try:
     import onnxruntime as ort
@@ -94,10 +94,12 @@ def _create_timm_model(model_type, num_classes=4, pretrained=False):
 
 
 def _load_onnx_session(model_type: str):
-    """Load ONNX runtime session for a model."""
-    global _ort_session
+    """Load ONNX runtime session for a model. Uses per-model cache to avoid overwrites."""
     if not _ort_available:
         return None
+
+    if model_type in _ort_sessions:
+        return _ort_sessions[model_type]
 
     global MODEL_PATHS
     if MODEL_PATHS is None:
@@ -107,13 +109,13 @@ def _load_onnx_session(model_type: str):
     if onnx_path and os.path.exists(onnx_path):
         try:
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            _ort_session = ort.InferenceSession(onnx_path, providers=providers)
+            session = ort.InferenceSession(onnx_path, providers=providers)
+            _ort_sessions[model_type] = session
             logger.info(f"Loaded ONNX session for {model_type} from {onnx_path}")
-            return _ort_session
+            return session
         except Exception as e:
             logger.warning(f"Failed to load ONNX for {model_type}: {e}")
-            _ort_session = None
-    return _ort_session
+    return None
 
 
 def _run_onnx_inference(model_type: str, tensor: torch.Tensor) -> dict[str, Any] | None:
@@ -214,6 +216,24 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> tuple[nn.Mo
     return model, checkpoint_loaded, in_features
 
 
+class _OnnxModelWrapper(nn.Module):
+    """Wraps an ONNX session so ensemble.py can call model(tensor) transparently."""
+
+    def __init__(self, model_type: str, session):
+        super().__init__()
+        self._model_type = model_type
+        self._session = session
+        self.eval()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 3:
+            x = x.unsqueeze(0)
+        np_input = x.detach().cpu().numpy()
+        input_name = self._session.get_inputs()[0].name
+        outputs = self._session.run(None, {input_name: np_input})
+        return torch.tensor(outputs[0], dtype=torch.float32)
+
+
 class ModelManager:
     """Manages multiple ML models for ensemble inference with ONNX support."""
 
@@ -234,10 +254,12 @@ class ModelManager:
             MODEL_PATHS = _get_model_paths()
 
         # Try ONNX first
-        if _ort_available and _load_onnx_session(model_type):
-            logger.info(f"Using ONNX runtime for {model_type}")
-            self._model_types[model_type] = "onnx"
-            return nn.Module()  # Placeholder - ONNX runs separately
+        if _ort_available:
+            session = _load_onnx_session(model_type)
+            if session is not None:
+                logger.info(f"Using ONNX runtime for {model_type}")
+                self._model_types[model_type] = "onnx"
+                return _OnnxModelWrapper(model_type, session)
 
         # Try PyTorch checkpoint
         try:

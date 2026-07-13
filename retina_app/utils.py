@@ -91,13 +91,27 @@ class RetinaDataset(Dataset):
             "2_cataract": "Cataract",
             "3_glaucoma": "Glaucoma",
             "4_Diabetic_Retinopathy": "Retina Disease",
+            "Healthy": "Healthy",
+            "Cataract": "Cataract",
+            "Glaucoma": "Glaucoma",
+            "Retina Disease": "Retina Disease",
+            "normal": "Healthy",
+            "cataract": "Cataract",
+            "glaucoma": "Glaucoma",
+            "diabetic_retinopathy": "Retina Disease",
         }
+        seen_folders = set()
         for folder_name, class_name in folder_mapping.items():
-            folder_path = os.path.join(root_dir, folder_name)
-            if os.path.exists(folder_path):
+            folder_path = os.path.normpath(os.path.join(root_dir, folder_name))
+            # Use normcase for case-insensitive deduplication (Windows)
+            abs_path = os.path.normcase(os.path.abspath(folder_path))
+            if abs_path in seen_folders:
+                continue
+            if os.path.exists(folder_path) and os.path.isdir(folder_path):
+                seen_folders.add(abs_path)
                 class_idx = CLASS_TO_IDX[class_name]
                 for img_name in os.listdir(folder_path):
-                    if img_name.lower().endswith((".png", ".jpg", ".jpeg")):
+                    if img_name.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff")):
                         self.samples.append((os.path.join(folder_path, img_name), class_idx))
         print(f"Loaded {len(self.samples)} images")
         for cat in CATEGORIES:
