@@ -1,20 +1,29 @@
 {% extends "base.html" %}
 {% block title %}FundusNet — AI-Powered Retinal Screening{% endblock %}
 {% block content %}
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <div class="retina-page">
 
-  <header class="retina-header">
+  <header class="retina-header" role="banner">
     <a href="/" class="retina-brand" aria-label="FundusNet home">
       <div class="retina-brand-icon"><i data-lucide="eye" aria-hidden="true"></i></div>
       <span class="retina-brand-name">FundusNet</span>
     </a>
-    <span class="retina-header-info">AI-Assisted Screening</span>
+    <div class="retina-header-actions">
+      <span class="retina-header-info">AI-Assisted Screening</span>
+      <button id="dark-mode-toggle" class="retina-dark-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <i data-lucide="sun" class="dark-mode-icon-light" aria-hidden="true"></i>
+        <i data-lucide="moon" class="dark-mode-icon-dark" aria-hidden="true"></i>
+      </button>
+    </div>
   </header>
 
+  <main id="main-content" role="main">
   {% if error_message %}
-  <div class="retina-alert retina-alert-error" role="alert">
+  <div class="retina-alert retina-alert-error" role="alert" aria-live="assertive">
     <i data-lucide="alert-circle" aria-hidden="true"></i>
     <span>{{ error_message }}</span>
+    <a href="/" class="retina-btn retina-btn-sm">Try Again</a>
   </div>
   {% endif %}
 
@@ -43,6 +52,7 @@
         <span class="retina-btn-loader">
           <i data-lucide="loader-2" aria-hidden="true"></i>
           Analyzing&hellip;
+          <span id="analysis-timer" class="hidden" aria-live="off"></span>
         </span>
       </button>
     </form>
@@ -90,7 +100,7 @@
   {% endif %}
 
   {% if result %}
-  <div class="retina-result">
+  <div class="retina-result" role="region" aria-label="Analysis result" aria-live="polite">
 
     {% if result.is_refused %}
     <div class="retina-alert retina-alert-warning" role="alert">
@@ -206,14 +216,34 @@
   </div>
   {% endif %}
 
-  <footer class="retina-footer">
+  <footer class="retina-footer" role="contentinfo">
     <span>FundusNet &middot; AI-Assisted Retinal Screening</span>
   </footer>
 
+  </main>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  /* ── Dark mode toggle ── */
+  var toggle = document.getElementById('dark-mode-toggle');
+  var html = document.documentElement;
+  var savedTheme = localStorage.getItem('fundusnet-theme');
+  if (savedTheme === 'dark') {
+    html.classList.add('dark-mode');
+  } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.classList.add('dark-mode');
+  }
+
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      html.classList.toggle('dark-mode');
+      var isDark = html.classList.contains('dark-mode');
+      localStorage.setItem('fundusnet-theme', isDark ? 'dark' : 'light');
+      toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    });
+  }
+
   /* ── Upload handling ── */
   var fileInput = document.getElementById('id_image');
   var zone = document.getElementById('dropzone');
@@ -268,6 +298,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('upload-form').addEventListener('submit', function() {
       submitBtn.disabled = true;
       submitBtn.classList.add('retina-btn-loading');
+      /* Start elapsed timer */
+      var elapsed = 0;
+      var timerEl = document.getElementById('analysis-timer');
+      if (timerEl) {
+        timerEl.classList.remove('hidden');
+        var interval = setInterval(function() {
+          elapsed++;
+          timerEl.textContent = elapsed + 's';
+        }, 1000);
+        window._analysisInterval = interval;
+      }
     });
   }
 
