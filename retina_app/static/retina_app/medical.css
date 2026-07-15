@@ -1,47 +1,52 @@
-/* FundusNet — Ophthalmic Precision Design System */
+/* FundusNet — Precision Clinical Design System */
 
 /* ── Tokens ─────────────────────────────────────────────────────────────── */
 :root {
-  /* Brand */
-  --brand: #0E7490;
-  --brand-hover: #0C6680;
-  --brand-light: #22D3EE;
-  --brand-faint: #ECFEFF;
-  --brand-bg: rgba(14, 116, 144, 0.07);
-  --brand-bg-hover: rgba(14, 116, 144, 0.13);
+  /* Brand — Deep Indigo */
+  --brand: #4338CA;
+  --brand-hover: #3730A3;
+  --brand-light: #6366F1;
+  --brand-faint: rgba(67, 56, 202, 0.06);
+  --brand-bg: rgba(67, 56, 202, 0.08);
+  --brand-bg-hover: rgba(67, 56, 202, 0.14);
+
+  /* Accent — Warm Amber (ophthalmoscope beam) */
+  --accent: #F59E0B;
+  --accent-hover: #D97706;
+  --accent-faint: rgba(245, 158, 11, 0.08);
 
   /* Surfaces */
-  --bg: #F0FDFA;
-  --bg-gradient: linear-gradient(165deg, #F0FDFA 0%, #ECFEFF 50%, #F0FDFA 100%);
+  --bg: #F8F7F4;
+  --bg-gradient: linear-gradient(165deg, #F8F7F4 0%, #F0EEFA 50%, #F8F7F4 100%);
   --surface: #FFFFFF;
-  --surface-hover: #F8FAFC;
+  --surface-hover: #FAFAF8;
 
   /* Semantic */
   --healthy: #059669;
-  --healthy-bg: rgba(5, 150, 105, 0.08);
+  --healthy-bg: rgba(5, 150, 105, 0.07);
   --healthy-border: rgba(5, 150, 105, 0.2);
-  --abnormal: #DC2626;
-  --abnormal-bg: rgba(220, 38, 38, 0.07);
-  --abnormal-border: rgba(220, 38, 38, 0.2);
+  --abnormal: #E11D48;
+  --abnormal-bg: rgba(225, 29, 72, 0.06);
+  --abnormal-border: rgba(225, 29, 72, 0.2);
   --uncertain: #D97706;
-  --uncertain-bg: rgba(217, 119, 6, 0.08);
+  --uncertain-bg: rgba(217, 119, 6, 0.07);
   --uncertain-border: rgba(217, 119, 6, 0.2);
 
   /* Text */
-  --text: #0F172A;
+  --text: #1E1B4B;
   --text-secondary: #475569;
   --text-muted: #94A3B8;
 
   /* Borders & Shadows */
   --border: #E2E8F0;
   --border-light: #F1F5F9;
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 16px 40px rgba(14, 116, 144, 0.1);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.06), 0 8px 24px rgba(14,116,144,0.06);
+  --shadow-xs: 0 1px 2px rgba(30, 27, 75, 0.04);
+  --shadow-sm: 0 1px 3px rgba(30, 27, 75, 0.06), 0 1px 2px rgba(30, 27, 75, 0.04);
+  --shadow: 0 4px 12px rgba(30, 27, 75, 0.06);
+  --shadow-md: 0 8px 24px rgba(30, 27, 75, 0.08);
+  --shadow-lg: 0 16px 40px rgba(67, 56, 202, 0.1);
+  --shadow-card: 0 1px 3px rgba(30,27,75,0.04), 0 4px 12px rgba(30,27,75,0.03);
+  --shadow-card-hover: 0 4px 16px rgba(30,27,75,0.06), 0 8px 24px rgba(67,56,202,0.06);
 
   /* Spacing */
   --space-1: 0.25rem;
@@ -64,8 +69,8 @@
   --radius-full: 9999px;
 
   /* Typography */
-  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -87,41 +92,45 @@
 
 /* ── Dark Mode ──────────────────────────────────────────────────────────── */
 .dark-mode {
-  --brand: #22D3EE;
-  --brand-hover: #67E8F9;
-  --brand-light: #0E7490;
-  --brand-faint: rgba(34, 211, 238, 0.1);
-  --brand-bg: rgba(34, 211, 238, 0.08);
-  --brand-bg-hover: rgba(34, 211, 238, 0.15);
+  --brand: #818CF8;
+  --brand-hover: #A5B4FC;
+  --brand-light: #4338CA;
+  --brand-faint: rgba(129, 140, 248, 0.08);
+  --brand-bg: rgba(129, 140, 248, 0.1);
+  --brand-bg-hover: rgba(129, 140, 248, 0.18);
 
-  --bg: #0F172A;
-  --bg-gradient: linear-gradient(165deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
-  --surface: #1E293B;
-  --surface-hover: #334155;
+  --accent: #FBBF24;
+  --accent-hover: #F59E0B;
+  --accent-faint: rgba(251, 191, 36, 0.1);
+
+  --bg: #0C0A1D;
+  --bg-gradient: linear-gradient(165deg, #0C0A1D 0%, #13102B 50%, #0C0A1D 100%);
+  --surface: #1A1730;
+  --surface-hover: #231F3D;
 
   --healthy: #34D399;
   --healthy-bg: rgba(52, 211, 153, 0.1);
   --healthy-border: rgba(52, 211, 153, 0.25);
-  --abnormal: #F87171;
-  --abnormal-bg: rgba(248, 113, 113, 0.1);
-  --abnormal-border: rgba(248, 113, 113, 0.25);
+  --abnormal: #FB7185;
+  --abnormal-bg: rgba(251, 113, 133, 0.1);
+  --abnormal-border: rgba(251, 113, 133, 0.25);
   --uncertain: #FBBF24;
   --uncertain-bg: rgba(251, 191, 36, 0.1);
   --uncertain-border: rgba(251, 191, 36, 0.25);
 
-  --text: #F1F5F9;
-  --text-secondary: #CBD5E1;
-  --text-muted: #64748B;
+  --text: #F1F0FF;
+  --text-secondary: #C4B5FD;
+  --text-muted: #6366F1;
 
-  --border: #334155;
-  --border-light: #1E293B;
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
-  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.3), 0 8px 24px rgba(34,211,238,0.08);
+  --border: #2D2A4A;
+  --border-light: #1A1730;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.4), 0 8px 24px rgba(129,140,248,0.08);
 }
 
 .dark-mode img { filter: brightness(0.9); }
@@ -154,6 +163,22 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dot grid background — medical graph paper */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--border) 0.7px, transparent 0.7px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark-mode body::before {
+  opacity: 0.12;
 }
 
 /* ── Accessibility ──────────────────────────────────────────────────────── */
@@ -189,8 +214,8 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 0 var(--space-3) 0;
   color: var(--text);
 }
-h1 { font-size: var(--text-4xl); letter-spacing: -0.025em; font-weight: 800; }
-h2 { font-size: var(--text-2xl); letter-spacing: -0.015em; }
+h1 { font-size: var(--text-4xl); letter-spacing: -0.03em; font-weight: 700; }
+h2 { font-size: var(--text-2xl); letter-spacing: -0.02em; }
 h3 { font-size: var(--text-xl); }
 p { margin: 0 0 var(--space-4) 0; color: var(--text-secondary); }
 a { color: var(--brand); text-decoration: none; transition: color var(--duration) var(--ease); }
@@ -199,12 +224,14 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 
 /* ── Frame ──────────────────────────────────────────────────────────────── */
 .retina-page {
-  max-width: 860px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-6) var(--space-6);
+  padding: var(--space-10) var(--space-6) var(--space-6);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -212,7 +239,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-12);
+  margin-bottom: var(--space-16);
   padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--border);
 }
@@ -226,35 +253,46 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-brand:hover { color: var(--text); }
 .retina-brand:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; border-radius: var(--radius); }
 .retina-brand-icon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   background: var(--brand);
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform var(--duration) var(--ease-spring), box-shadow var(--duration) var(--ease);
+  position: relative;
+}
+/* Amber scan ring on brand icon */
+.retina-brand-icon::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: calc(var(--radius-lg) + 3px);
+  border: 2px solid var(--accent);
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease), transform var(--duration) var(--ease);
+  transform: scale(0.9);
 }
 .retina-brand:hover .retina-brand-icon {
   transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(14, 116, 144, 0.25);
+  box-shadow: 0 2px 12px rgba(67, 56, 202, 0.3);
+}
+.retina-brand:hover .retina-brand-icon::after {
+  opacity: 1;
+  transform: scale(1);
 }
 .retina-brand-icon svg { width: 20px; height: 20px; color: #fff; }
 .retina-brand-name {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: var(--text-xl);
-  letter-spacing: -0.02em;
-}
-.retina-header-info {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-weight: 500;
+  letter-spacing: -0.03em;
 }
 .retina-header-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 .retina-dark-toggle {
   background: var(--surface);
@@ -282,24 +320,6 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .dark-mode-icon-dark { display: none; }
 .dark-mode .dark-mode-icon-light { display: none; }
 .dark-mode .dark-mode-icon-dark { display: block; }
-#analysis-timer {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  margin-left: var(--space-2);
-}
-  font-size: var(--text-lg);
-  font-weight: 800;
-  margin: 0;
-  color: var(--text);
-  letter-spacing: -0.02em;
-}
-.retina-header-info {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-weight: 500;
-  font-family: var(--font-display);
-}
 
 /* ── Alerts ─────────────────────────────────────────────────────────────── */
 .retina-alert {
@@ -307,7 +327,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-6);
   font-size: var(--text-sm);
   line-height: 1.5;
@@ -326,9 +346,9 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   border-color: #FDE68A;
 }
 .retina-alert-info {
-  background: var(--brand-bg);
+  background: var(--brand-faint);
   color: var(--brand);
-  border-color: rgba(14, 116, 144, 0.15);
+  border-color: rgba(67, 56, 202, 0.12);
   font-size: var(--text-xs);
 }
 
@@ -365,7 +385,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   content: '';
   position: absolute;
   border-radius: 50%;
-  border: 1px solid var(--brand);
+  border: 1px solid var(--accent);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
@@ -381,17 +401,17 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 
 @keyframes iris-pulse {
   0%, 100% { opacity: 0; transform: scale(0.95); }
-  50% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1); }
 }
 
 .retina-dropzone:hover {
-  border-color: var(--brand);
+  border-color: var(--accent);
   background: var(--surface-hover);
-  box-shadow: 0 0 0 4px var(--brand-bg), var(--shadow);
+  box-shadow: 0 0 0 4px var(--accent-faint), var(--shadow);
 }
 .retina-dropzone:hover::before,
 .retina-dropzone:hover::after {
-  opacity: 0.25;
+  opacity: 0.3;
 }
 .retina-dropzone:focus-within {
   border-color: var(--brand);
@@ -401,22 +421,44 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 
 /* Drag-over state: rings expand outward */
 .retina-dropzone-over {
-  border-color: var(--brand) !important;
-  background: var(--brand-bg) !important;
-  box-shadow: 0 0 0 6px var(--brand-bg), var(--shadow-md) !important;
+  border-color: var(--accent) !important;
+  background: var(--accent-faint) !important;
+  box-shadow: 0 0 0 6px var(--accent-faint), var(--shadow-md) !important;
 }
 .retina-dropzone-over::before {
-  opacity: 0.4 !important;
+  opacity: 0.5 !important;
   animation: iris-expand 0.8s var(--ease-out) infinite !important;
 }
 .retina-dropzone-over::after {
-  opacity: 0.3 !important;
+  opacity: 0.4 !important;
   animation: iris-expand 0.8s var(--ease-out) 0.2s infinite !important;
 }
 
 @keyframes iris-expand {
-  0% { transform: scale(0.9); opacity: 0.4; }
+  0% { transform: scale(0.9); opacity: 0.5; }
   100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Scan-line animation on hover */
+.retina-dropzone .retina-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  top: 0;
+}
+.retina-dropzone:hover .retina-scanline {
+  opacity: 0.6;
+  animation: scanline 2s var(--ease) infinite;
+}
+
+@keyframes scanline {
+  0% { top: 0; }
+  100% { top: 100%; }
 }
 
 /* Subtle radial glow behind the dropzone */
@@ -424,9 +466,9 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   position: absolute;
   inset: -40px;
   border-radius: 50%;
-  background: radial-gradient(circle at center, var(--brand-bg) 0%, transparent 60%);
+  background: radial-gradient(circle at center, var(--accent-faint) 0%, transparent 60%);
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .retina-dropzone input[type="file"] {
@@ -573,16 +615,16 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-btn-primary {
   background: var(--brand);
   color: #fff;
-  box-shadow: 0 1px 3px rgba(14, 116, 144, 0.3);
+  box-shadow: 0 1px 3px rgba(67, 56, 202, 0.3);
 }
 .retina-btn-primary:hover {
   background: var(--brand-hover);
-  box-shadow: 0 4px 12px rgba(14, 116, 144, 0.35);
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.35);
   transform: translateY(-1px);
 }
 .retina-btn-primary:active {
   transform: translateY(0);
-  box-shadow: 0 1px 3px rgba(14, 116, 144, 0.3);
+  box-shadow: 0 1px 3px rgba(67, 56, 202, 0.3);
 }
 .retina-btn-primary:disabled {
   opacity: 0.4;
@@ -604,63 +646,6 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-btn-loader svg { animation: retina-spin 1s linear infinite; }
 
 @keyframes retina-spin { to { transform: rotate(360deg); } }
-
-/* ── How It Works ───────────────────────────────────────────────────────── */
-.retina-how {
-  margin-top: var(--space-16);
-  padding-top: var(--space-10);
-  border-top: 1px solid var(--border);
-}
-.retina-how-title {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: var(--space-8);
-  color: var(--text);
-  letter-spacing: -0.01em;
-}
-.retina-how-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-8);
-}
-.retina-how-step {
-  text-align: center;
-}
-.retina-how-number {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--brand-bg);
-  color: var(--brand);
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto var(--space-4);
-  transition: background var(--duration) var(--ease), transform var(--duration) var(--ease-spring);
-}
-.retina-how-step:hover .retina-how-number {
-  background: var(--brand);
-  color: #fff;
-  transform: scale(1.08);
-}
-.retina-how-step-title {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: var(--space-2);
-}
-.retina-how-step-desc {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
 
 /* ── Result Section ─────────────────────────────────────────────────────── */
 .retina-result {
@@ -705,7 +690,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 }
 .retina-hero-image-wrap:hover {
   box-shadow: var(--shadow-md);
-  border-color: var(--brand);
+  border-color: var(--accent);
 }
 .retina-hero-image {
   width: 100%;
@@ -717,7 +702,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, var(--brand-bg) 0%, transparent 50%);
+  background: radial-gradient(circle at 50% 40%, var(--accent-faint) 0%, transparent 50%);
   pointer-events: none;
 }
 
@@ -736,7 +721,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-prediction {
   font-family: var(--font-display);
   font-size: var(--text-4xl);
-  font-weight: 800;
+  font-weight: 700;
   margin: 0;
   letter-spacing: -0.03em;
   line-height: 1.1;
@@ -761,8 +746,8 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-confidence-value {
   font-family: var(--font-display);
   font-size: var(--text-3xl);
-  font-weight: 800;
-  color: var(--brand);
+  font-weight: 700;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -794,8 +779,8 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-badge-healthy { background: var(--healthy-bg); color: var(--healthy); border-color: var(--healthy-border); }
 .retina-badge-abnormal { background: var(--abnormal-bg); color: var(--abnormal); border-color: var(--abnormal-border); }
 .retina-badge-uncertain { background: var(--uncertain-bg); color: var(--uncertain); border-color: var(--uncertain-border); }
-.retina-badge-model { background: var(--brand-bg); color: var(--brand); border-color: rgba(14, 116, 144, 0.2); }
-.retina-badge-uncertainty { background: var(--brand-bg); color: var(--brand); border-color: rgba(14, 116, 144, 0.2); }
+.retina-badge-model { background: var(--brand-bg); color: var(--brand); border-color: rgba(67, 56, 202, 0.2); }
+.retina-badge-uncertainty { background: var(--accent-faint); color: var(--accent-hover); border-color: rgba(245, 158, 11, 0.2); }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 .retina-card {
@@ -809,7 +794,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 }
 .retina-card:hover {
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(14, 116, 144, 0.15);
+  border-color: rgba(67, 56, 202, 0.15);
 }
 .retina-card-title {
   display: flex;
@@ -908,7 +893,6 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   .retina-page { padding: var(--space-5) var(--space-4) var(--space-3); }
   .retina-header { margin-bottom: var(--space-8); }
   .retina-brand-name { font-size: var(--text-base); }
-  .retina-header-info { font-size: var(--text-xs); }
 
   .retina-dropzone { width: 230px; height: 230px; }
   .retina-dropzone-icon { width: 44px; height: 44px; }
@@ -926,16 +910,8 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
     grid-template-columns: 90px 1fr 44px;
     gap: var(--space-2);
   }
-
-  .retina-how-grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-    max-width: 300px;
-    margin: 0 auto;
-  }
   .retina-conditions { gap: var(--space-2); }
   .retina-condition { font-size: var(--text-xs); padding: var(--space-1) var(--space-2); }
-
   .retina-card { padding: var(--space-5); }
 }
 
@@ -969,7 +945,7 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 .retina-table tbody tr:hover { background: var(--surface-hover); }
 .retina-table tbody tr:last-child td { border-bottom: none; }
 
-/* ── Buttons ─────────────────────────────────────────────────────────────── */
+/* ── Small Buttons ───────────────────────────────────────────────────────── */
 .retina-btn-sm {
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
@@ -1005,3 +981,11 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 }
 .retina-empty svg { width: 48px; height: 48px; margin-bottom: var(--space-4); opacity: 0.4; }
 .retina-empty p { margin-bottom: var(--space-6); }
+
+/* ── Analysis Timer ─────────────────────────────────────────────────────── */
+#analysis-timer {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-left: var(--space-2);
+}

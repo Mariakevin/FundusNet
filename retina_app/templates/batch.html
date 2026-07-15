@@ -32,6 +32,7 @@
       {% csrf_token %}
       <label for="id_images" class="retina-dropzone" id="batch-dropzone">
         <div class="retina-dropzone-glow" aria-hidden="true"></div>
+        <div class="retina-scanline" aria-hidden="true"></div>
         <input type="file" name="images" id="id_images" accept=".jpg,.jpeg,.png,.bmp,.webp,.tiff" multiple required>
         <div id="batch-placeholder" class="retina-dropzone-inner">
           <div class="retina-dropzone-icon"><i data-lucide="upload-cloud" aria-hidden="true"></i></div>
@@ -100,7 +101,7 @@
   </main>
 
   <footer class="retina-footer" role="contentinfo">
-    <span>FundusNet &middot; AI-Assisted Retinal Screening</span>
+    <span>FundusNet &middot; Precision Retinal Screening</span>
   </footer>
 </div>
 

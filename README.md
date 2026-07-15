@@ -34,6 +34,7 @@
   <img src="https://img.shields.io/badge/OpenCV-4.12-blueviolet?logo=opencv&logoColor=white">
   <img src="https://img.shields.io/badge/Model_Ensemble-5_models-important">
   <img src="https://img.shields.io/badge/Explainability-GradCAM-success">
+  <img src="https://img.shields.io/badge/Frontend-Precision_Clinical-818CF8?logo=css3&logoColor=white">
   <img src="https://img.shields.io/badge/License-Proprietary-lightgrey">
 </p>
 
@@ -54,6 +55,7 @@ FundusNet turns a fundus photograph into a **multi-class screening decision** �
 | **Image validation** | Accepts anything | 6-signal fundus heuristic |
 | **Inference speed** | CPU-bound | ONNX runtime (3-5x faster) |
 | **Reproducibility** | Manual | Seeded pipelines, CI-ready |
+| **Frontend** | Generic UI | Precision Clinical design · Space Grotesk · Dark mode |
 
 ---
 
@@ -115,7 +117,7 @@ FundusNet/
 │   │   ├── preprocessing.py  # CLAHE, ROI, quality checks
 │   │   ├── fundus_validator.py  # 6-signal heuristic
 │   │   └── model_manager.py  # Lazy-loaded singleton + ONNX runtime
-│   ├── templates/            # SPA UI
+│   ├── templates/            # Precision Clinical SPA UI
 │   ├── tests/                # Test suite
 │   ├── api.py               # REST API endpoints
 │   ├── constants.py         # Centralized configuration
@@ -272,5 +274,5 @@ GitHub Actions pipeline runs on every push:
 
 <p align="center">
   <i>Built with Django, PyTorch, and OpenCV</i><br>
-  <b>FundusNet</b> — interpretable, uncertainty-aware retinal disease screening
+  <b>FundusNet</b> — Precision Clinical retinal disease screening
 </p>
