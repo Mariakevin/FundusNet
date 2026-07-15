@@ -1,0 +1,436 @@
+openapi: 3.0.3
+info:
+  title: FundusNet API
+  description: |
+    Retinal disease screening API powered by a 5-model ensemble.
+    
+    ## Authentication
+    If `FUNDUSNET_API_KEYS` is configured, all prediction endpoints require
+    the `X-API-Key` header. Health and stats endpoints are public.
+    
+    ## Rate Limiting
+    - 30 requests per minute per IP
+    - Returns 429 with `Retry-After` header when exceeded
+  version: 1.0.0
+  contact:
+    name: FundusNet
+    url: https://github.com/Mariakevin/FundusNet
+
+servers:
+  - url: http://localhost:8000
+    description: Development
+  - url: https://your-domain.com
+    description: Production
+
+paths:
+  /api/v1/:
+    get:
+      summary: API root
+      description: Lists all available endpoints.
+      operationId: apiRoot
+      tags: [System]
+      responses:
+        '200':
+          description: Endpoint list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: FundusNet API
+                  version:
+                    type: string
+                    example: v1
+                  endpoints:
+                    type: object
+
+  /api/v1/health/:
+    get:
+      summary: Model health status
+      description: Returns health status of all loaded models.
+      operationId: modelHealth
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  models:
+                    type: object
+                  timestamp:
+                    type: number
+
+  /api/v1/stats/:
+    get:
+      summary: Service statistics
+      description: Returns batch inference service statistics.
+      operationId: serviceStats
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+
+  /api/v1/predict/:
+    post:
+      summary: Single image prediction
+      description: |
+        Analyze a single retinal fundus image.
+        
+        Returns classification (Healthy, Cataract, Glaucoma, Retina Disease),
+        confidence score, Grad-CAM heatmap, and uncertainty metrics.
+      operationId: predictSingle
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Retinal fundus image (JPG, PNG, BMP, WebP, TIFF, max 10MB)
+                use_ensemble:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "true"
+                  description: Use multi-model ensemble
+                use_tta:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Use test-time augmentation
+                use_gradcam:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "true"
+                  description: Generate Grad-CAM heatmap
+      responses:
+        '200':
+          description: Prediction result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionResult'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or missing API key
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+        '500':
+          description: Server error
+
+  /api/v1/predict/batch/:
+    post:
+      summary: Batch prediction
+      description: Submit multiple images for prediction. Returns a job ID for tracking.
+      operationId: predictBatch
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_paths]
+              properties:
+                image_paths:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 100
+                  description: List of absolute image paths on the server
+                config:
+                  type: object
+                  description: Optional prediction config
+                priority:
+                  type: integer
+                  default: 2
+                  description: Job priority (1=high, 2=normal, 3=low)
+      responses:
+        '200':
+          description: Job submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  job_id:
+                    type: string
+                  status_url:
+                    type: string
+                  total_images:
+                    type: integer
+        '400':
+          description: Invalid input
+        '429':
+          description: Rate limit exceeded
+
+  /api/v1/jobs/{job_id}/:
+    get:
+      summary: Job status
+      description: Get status and results of a batch prediction job.
+      operationId: jobStatus
+      tags: [Inference]
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404':
+          description: Job not found
+
+  /api/v1/registry/:
+    get:
+      summary: List registered models
+      description: List models in the registry with optional filtering.
+      operationId: modelRegistry
+      tags: [Models]
+      security: []
+      parameters:
+        - name: model_name
+          in: query
+          schema:
+            type: string
+          description: Filter by model name
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelArtifact'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/leaderboard/:
+    get:
+      summary: Model leaderboard
+      description: Get model performance leaderboard.
+      operationId: leaderboard
+      tags: [Models]
+      security: []
+      parameters:
+        - name: model_name
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /api/v1/experiments/:
+    get:
+      summary: List training experiments
+      description: List training experiments with metrics.
+      operationId: experiments
+      tags: [Models]
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Experiment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authenticated endpoints
+
+  schemas:
+    PredictionResult:
+      type: object
+      properties:
+        label:
+          type: string
+          enum: [Healthy, Cataract, Glaucoma, Retina Disease, Uncertain]
+        confidence:
+          type: number
+          format: float
+          description: Confidence score 0-1
+        probabilities:
+          type: array
+          items:
+            type: number
+          description: Per-class probabilities [Healthy, Cataract, Glaucoma, Retina Disease]
+        model_version:
+          type: string
+        model_source:
+          type: string
+          enum: [trained, pretrained]
+        latency:
+          type: number
+          description: Inference time in seconds
+        cached:
+          type: boolean
+        use_ensemble:
+          type: boolean
+        n_models:
+          type: integer
+        is_refused:
+          type: boolean
+        refusal_message:
+          type: string
+        gradcam_url:
+          type: string
+        uncertainty:
+          type: object
+          properties:
+            entropy:
+              type: number
+            is_uncertain:
+              type: boolean
+            n_passes:
+              type: integer
+        confidence_warning:
+          type: string
+          enum: [low, medium]
+        confidence_message:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    JobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        progress:
+          type: number
+        results:
+          type: array
+          items:
+            type: object
+
+    ModelArtifact:
+      type: object
+      properties:
+        model:
+          type: string
+        version:
+          type: string
+        stage:
+          type: string
+        metrics:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        tags:
+          type: object
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
