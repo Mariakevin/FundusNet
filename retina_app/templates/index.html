@@ -25,6 +25,13 @@
   </div>
   {% endif %}
 
+  {% if model_status and model_status.loading %}
+  <div class="retina-alert retina-alert-info" role="status" aria-live="polite" style="margin-bottom: 1.5rem;">
+    <i data-lucide="loader-2" aria-hidden="true" style="animation: spin 1.5s linear infinite;"></i>
+    <span>Models are loading in the background. Analysis may take longer on first upload.</span>
+  </div>
+  {% endif %}
+
   {% if not result %}
   <div class="retina-upload-section">
     <form method="post" enctype="multipart/form-data" id="upload-form" class="retina-form">

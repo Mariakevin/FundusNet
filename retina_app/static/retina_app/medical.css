@@ -989,3 +989,9 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
   color: var(--text-muted);
   margin-left: var(--space-2);
 }
+
+/* Model loading spinner */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
