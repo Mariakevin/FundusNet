@@ -119,3 +119,21 @@ FUNDUS_AREA_MAX_RATIO = 0.90
 FUNDUS_EDGE_MIN_RATIO = 0.01
 FUNDUS_EDGE_MAX_RATIO = 0.25
 FUNDUS_GREEN_CH_MIN_STD = 15.0
+
+# --- Startup Validation ---
+def _validate_constants():
+    """Validate constants at import time to catch configuration errors early."""
+    total_weight = sum(MODEL_WEIGHTS.values())
+    if abs(total_weight - 1.0) > 0.01:
+        raise ValueError(f"MODEL_WEIGHTS must sum to 1.0, got {total_weight}")
+
+    if len(MODEL_WEIGHTS) != len(MODEL_LIST):
+        raise ValueError(
+            f"MODEL_WEIGHTS has {len(MODEL_WEIGHTS)} entries but MODEL_LIST has {len(MODEL_LIST)}"
+        )
+
+    for model in MODEL_LIST:
+        if model not in MODEL_WEIGHTS:
+            raise ValueError(f"Model '{model}' in MODEL_LIST but not in MODEL_WEIGHTS")
+
+_validate_constants()

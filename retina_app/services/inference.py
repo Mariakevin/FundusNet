@@ -1,4 +1,5 @@
 """Inference orchestrator — thin facade over preprocessing, model_manager, ensemble, cache.
+
 All public API remains importable from this module for backward compatibility.
 """
 
@@ -18,20 +19,15 @@ from django.conf import settings as django_settings
 from PIL import Image
 
 from retina_app.constants import (
-    CATEGORIES,
     CONFIDENCE_THRESHOLD_HIGH,
     CONFIDENCE_THRESHOLD_LOW,
-    CONFIDENCE_THRESHOLD_REFUSE,
     ENABLE_MC_DROPOUT,
     ENSEMBLE_MIN_MODELS,
-    FUNDUS_MIN_TOP1_TOP2_RATIO,
     FUNDUS_VALIDATION_ENABLED,
     GRADCAM_MODEL,
     MAX_WORKERS,
     MODEL_LIST,
     MODEL_WEIGHTS,
-    OOD_ENTROPY_THRESHOLD,
-    UNCERTAINTY_REFUSAL_MESSAGE,
 )
 from retina_app.services.ensemble import (
     _predict_single_model,
@@ -47,7 +43,7 @@ from retina_app.services.exceptions import (
     NotAFundusImageError,
 )
 from retina_app.services.fundus_validator import validate_fundus_image
-from retina_app.services.gradcam import generate_gradcam, get_gradcam_output_path
+from retina_app.services.gradcam import generate_gradcam_for_image
 from retina_app.services.image_cache import (
     _get_image_hash,
     get_cache_entry,
@@ -64,6 +60,7 @@ from retina_app.services.preprocessing import (
     preprocess_fundus,
     validate_image_file,
 )
+from retina_app.services.refusal import check_all_refusals
 
 logger = logging.getLogger("retina_app")
 
@@ -79,6 +76,148 @@ def get_executor():
                 _executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
                 atexit.register(_executor.shutdown, wait=False)
     return _executor
+
+
+def _load_and_validate_image(image_path: str) -> Image.Image:
+    """Load image once and validate. Returns loaded PIL Image."""
+    try:
+        with Image.open(image_path) as img:
+            img.verify()
+            img.seek(0)
+            pil_image = Image.open(image_path)
+            pil_image.load()
+    except Exception as exc:
+        logger.warning("Corrupted image file %s: %s", image_path, exc)
+        raise ImageCorruptError(f"Corrupted or unreadable image: {exc}") from exc
+
+    try:
+        validate_image_file(image_path, pil_image=pil_image)
+    except ImageValidationError as exc:
+        logger.warning("Image validation failed for %s: %s", image_path, exc)
+        raise InferenceError(f"Invalid image: {exc}") from exc
+
+    if FUNDUS_VALIDATION_ENABLED:
+        fundus_check = validate_fundus_image(image_path, pil_image=pil_image)
+        if not fundus_check["is_fundus"]:
+            logger.warning(
+                "Non-fundus image rejected: score=%.3f, signals=%s, path=%s",
+                fundus_check["confidence"],
+                fundus_check["signals"],
+                image_path,
+            )
+            raise NotAFundusImageError(fundus_check["message"])
+
+    try:
+        quality_check = check_image_quality(image_path, quality_threshold=0.25, pil_image=pil_image)
+        if not quality_check["passed"]:
+            logger.warning("Image quality check failed: %s", quality_check["quality_level"])
+    except Exception as exc:
+        logger.warning("Quality check failed, continuing: %s", exc)
+
+    return pil_image
+
+
+def _apply_preprocessing(image_path: str, use_clahe: bool) -> tuple[str, str]:
+    """Apply CLAHE preprocessing if requested. Returns (target_path, preprocessed_path)."""
+    if not use_clahe:
+        return image_path, None
+
+    try:
+        preprocessed = preprocess_fundus(image_path, enhance=False, detect_roi=False)
+        preprocessed = apply_clahe(preprocessed)
+        ext = os.path.splitext(image_path)[1]
+        img_hash = _get_image_hash(image_path)
+        tmp_dir = tempfile.gettempdir()
+        preprocessed_path = os.path.join(tmp_dir, f"fundus_{img_hash}_clahe{ext}")
+        cv2.imwrite(preprocessed_path, cv2.cvtColor(preprocessed, cv2.COLOR_RGB2BGR))
+        logger.info("Applied preprocessing pipeline to %s", image_path)
+        return preprocessed_path, preprocessed_path
+    except Exception as exc:
+        logger.warning("Preprocessing failed, using original: %s", exc)
+        return image_path, None
+
+
+def _run_ensemble(
+    model_manager,
+    target_path: str,
+    use_tta: bool,
+) -> tuple[dict, list, str, str]:
+    """Run ensemble inference. Returns (final_result, predictions, model_ver, model_source)."""
+    logger.info(
+        "Running ensemble with %d models: %s",
+        len(model_manager._models),
+        list(model_manager._models.keys()),
+    )
+
+    predictions = predict_models_parallel(model_manager._models, target_path, use_tta, get_executor())
+
+    health_tracker = get_health_tracker()
+    health_tracker.record_ensemble_prediction(predictions)
+
+    disagreement = detect_model_disagreement(predictions)
+    if disagreement["disagreement"]:
+        logger.info(
+            "Model disagreement detected: %s, agreement=%.2f",
+            disagreement["class_votes"],
+            disagreement["agreement_level"],
+        )
+
+    final_result = selective_ensemble(predictions)
+    n_models = final_result.get("n_models", len(predictions))
+    model_ver = f"ensemble-v{n_models}-models-tta" if use_tta else f"ensemble-v{n_models}-models"
+
+    model_types = [model_manager._model_types.get(mt, "unknown") for mt, _ in predictions]
+    has_trained = "trained" in model_types
+    model_source = "trained" if has_trained else "pretrained"
+
+    return final_result, predictions, model_ver, model_source
+
+
+def _run_single_model(
+    model_manager,
+    target_path: str,
+    use_tta: bool,
+) -> tuple[dict, list, str, str]:
+    """Run single model inference. Returns (final_result, predictions, model_ver, model_source)."""
+    model = model_manager.get_model(MODEL_LIST[0])
+    final_result = _predict_single_model(model, target_path, use_tta=use_tta)
+    model_ver = MODEL_VERSIONS.get(MODEL_LIST[0], "demo")
+    model_source = model_manager._model_types.get(MODEL_LIST[0], "pretrained")
+    return final_result, [], model_ver, model_source
+
+
+def _run_uncertainty(
+    model_manager,
+    target_path: str,
+) -> dict | None:
+    """Run MC Dropout uncertainty quantification."""
+    if not ENABLE_MC_DROPOUT:
+        return None
+    try:
+        data = predict_with_uncertainty_ensemble(
+            model_manager._models,
+            target_path,
+            model_weights=MODEL_WEIGHTS,
+        )
+        logger.info(
+            "MC Dropout uncertainty: entropy=%.4f, uncertain=%s",
+            data["entropy"],
+            data["is_uncertain"],
+        )
+        return data
+    except Exception as exc:
+        logger.warning("MC Dropout uncertainty failed: %s", exc)
+        return None
+
+
+def _build_confidence_warning(confidence: float) -> tuple[str | None, str | None]:
+    """Determine confidence warning level and message."""
+    if confidence < CONFIDENCE_THRESHOLD_LOW:
+        logger.warning("Low confidence prediction: %.2f < %.2f", confidence, CONFIDENCE_THRESHOLD_LOW)
+        return "low", "Low confidence. Result may be unreliable. Consider retaking the image with better lighting."
+    elif confidence < CONFIDENCE_THRESHOLD_HIGH:
+        return "medium", "Medium confidence. Result is reasonably reliable."
+    return None, None
 
 
 def predict_image(
@@ -98,66 +237,18 @@ def predict_image(
         use_clahe: Apply CLAHE preprocessing
         use_uncertainty: Run MC Dropout uncertainty quantification
         use_gradcam: Generate Grad-CAM explainability heatmap
-
     """
     start_time = time.time()
 
-    # Load image once and validate
-    try:
-        with Image.open(image_path) as img:
-            img.verify()
-            img.seek(0)
-            pil_image = Image.open(image_path)
-            pil_image.load()
-    except Exception as exc:
-        logger.warning("Corrupted image file %s: %s", image_path, exc)
-        raise ImageCorruptError(f"Corrupted or unreadable image: {exc}") from exc
+    # 1. Load and validate
+    _load_and_validate_image(image_path)
 
-    try:
-        validate_image_file(image_path, pil_image=pil_image)
-    except ImageValidationError as exc:
-        logger.warning(f"Image validation failed for {image_path}: {exc}")
-        raise InferenceError(f"Invalid image: {exc}") from exc
+    # 2. Preprocess
+    target_path, preprocessed_path = _apply_preprocessing(image_path, use_clahe)
 
-    # --- Fundus Image Validation ---
-    if FUNDUS_VALIDATION_ENABLED:
-        fundus_check = validate_fundus_image(image_path, pil_image=pil_image)
-        if not fundus_check["is_fundus"]:
-            logger.warning(
-                "Non-fundus image rejected: score=%.3f, signals=%s, path=%s",
-                fundus_check["confidence"],
-                fundus_check["signals"],
-                image_path,
-            )
-            raise NotAFundusImageError(fundus_check["message"])
-
-    try:
-        quality_check = check_image_quality(image_path, quality_threshold=0.25, pil_image=pil_image)
-        if not quality_check["passed"]:
-            logger.warning(f"Image quality check failed: {quality_check['quality_level']}")
-    except Exception as exc:
-        logger.warning(f"Quality check failed, continuing: {exc}")
-
-    preprocessed_path = None
-    if use_clahe:
-        try:
-            preprocessed = preprocess_fundus(image_path, enhance=False, detect_roi=False)
-            preprocessed = apply_clahe(preprocessed)
-            ext = os.path.splitext(image_path)[1]
-            img_hash = _get_image_hash(image_path)
-            tmp_dir = tempfile.gettempdir()
-            preprocessed_path = os.path.join(tmp_dir, f"fundus_{img_hash}_clahe{ext}")
-            cv2.imwrite(preprocessed_path, cv2.cvtColor(preprocessed, cv2.COLOR_RGB2BGR))
-            logger.info("Applied preprocessing pipeline to %s", image_path)
-        except Exception as exc:
-            logger.warning("Preprocessing failed, using original: %s", exc)
-            preprocessed_path = None
-
-    target_path = preprocessed_path if preprocessed_path else image_path
-
+    # 3. Check cache
     img_hash = _get_image_hash(target_path)
     model_manager = get_model_manager()
-
     model_version_key = "-".join(sorted(model_manager._models.keys())) if model_manager._models else "none"
     cache_key = (
         f"{img_hash}_{model_version_key}_"
@@ -173,190 +264,69 @@ def predict_image(
         result["latency"] = time.time() - start_time
         return result
 
+    # 4. Load models if needed
     if use_ensemble and len(model_manager._models) < ENSEMBLE_MIN_MODELS:
         for model_type in MODEL_LIST:
             _ = model_manager.get_model(model_type)
             if len(model_manager._models) >= ENSEMBLE_MIN_MODELS:
                 break
 
-    n_models_used = 1
-    predictions = []
+    # 5. Run inference
     try:
         if use_ensemble and len(model_manager._models) >= ENSEMBLE_MIN_MODELS:
-            logger.info(
-                f"Running ensemble with {len(model_manager._models)} models: {list(model_manager._models.keys())}"
+            final_result, predictions, model_ver, model_source = _run_ensemble(
+                model_manager, target_path, use_tta
+            )
+        else:
+            final_result, predictions, model_ver, model_source = _run_single_model(
+                model_manager, target_path, use_tta
             )
 
-            predictions = predict_models_parallel(model_manager._models, target_path, use_tta, get_executor())
-
-            health_tracker = get_health_tracker()
-            health_tracker.record_ensemble_prediction(predictions)
-
-            disagreement = detect_model_disagreement(predictions)
-            if disagreement["disagreement"]:
-                logger.info(
-                    f"Model disagreement detected: {disagreement['class_votes']}, "
-                    f"agreement={disagreement['agreement_level']:.2f}"
-                )
-
-            final_result = selective_ensemble(predictions)
-            n_models_used = final_result.get("n_models", len(predictions))
-            model_ver = f"ensemble-v{n_models_used}-models-tta" if use_tta else f"ensemble-v{n_models_used}-models"
-
-            model_types = [model_manager._model_types.get(mt, "unknown") for mt, _ in predictions]
-            has_trained = "trained" in model_types
-            model_source = "trained" if has_trained else "pretrained"
-        else:
-            model = model_manager.get_model(MODEL_LIST[0])
-            final_result = _predict_single_model(model, target_path, use_tta=use_tta)
-            model_ver = MODEL_VERSIONS.get(MODEL_LIST[0], "demo")
-            model_source = model_manager._model_types.get(MODEL_LIST[0], "pretrained")
-
         latency = time.time() - start_time
+        confidence = final_result["confidence"]
 
+        # Log mode
         mode_str = (
-            "Ensemble+TTA"
-            if use_ensemble and use_tta
-            else "Ensemble"
-            if use_ensemble
-            else "TTA"
-            if use_tta
+            "Ensemble+TTA" if use_ensemble and use_tta
+            else "Ensemble" if use_ensemble
+            else "TTA" if use_tta
             else "Standard"
         )
+        logger.info("%s inference: %s (%.2f) in %.2fs", mode_str, final_result["label"], confidence, latency)
 
-        confidence = final_result["confidence"]
-        confidence_warning = None
-        if confidence < CONFIDENCE_THRESHOLD_LOW:
-            confidence_warning = "low"
-            logger.warning(f"Low confidence prediction: {confidence:.2f} < {CONFIDENCE_THRESHOLD_LOW}")
-        elif confidence < CONFIDENCE_THRESHOLD_HIGH:
-            confidence_warning = "medium"
+        # 6. Confidence warning
+        confidence_warning, confidence_message = _build_confidence_warning(confidence)
 
-        logger.info(
-            "%s inference: %s (%.2f) in %.2fs",
-            mode_str,
-            final_result["label"],
-            confidence,
-            latency,
-        )
+        # 7. Uncertainty
+        uncertainty_data = _run_uncertainty(model_manager, target_path) if use_uncertainty and use_ensemble else None
 
-        # --- MC Dropout Uncertainty ---
-        uncertainty_data = None
-        if use_uncertainty and ENABLE_MC_DROPOUT and use_ensemble:
-            try:
-                uncertainty_data = predict_with_uncertainty_ensemble(
-                    model_manager._models,
-                    target_path,
-                    model_weights=MODEL_WEIGHTS,
-                )
-                logger.info(
-                    f"MC Dropout uncertainty: entropy={uncertainty_data['entropy']:.4f}, "
-                    f"uncertain={uncertainty_data['is_uncertain']}"
-                )
-            except Exception as exc:
-                logger.warning(f"MC Dropout uncertainty failed: {exc}")
-
-        # --- Grad-CAM Explainability ---
+        # 8. Grad-CAM
         gradcam_data = None
         if use_gradcam:
-            try:
-                gradcam_model_type = GRADCAM_MODEL
-                if gradcam_model_type in model_manager._models:
-                    gradcam_model = model_manager._models[gradcam_model_type]
-                    gradcam_output = get_gradcam_output_path(django_settings.MEDIA_ROOT, os.path.basename(image_path))
-                    gradcam_result = generate_gradcam(
-                        gradcam_model,
-                        target_path,
-                        gradcam_model_type,
-                        output_path=gradcam_output,
-                    )
-                    gradcam_url = f"{django_settings.MEDIA_URL}gradcam/{os.path.basename(gradcam_output)}"
-                    gradcam_data = {
-                        "url": gradcam_url,
-                        "predicted_class": gradcam_result["predicted_class"],
-                        "confidence": gradcam_result["confidence"],
-                    }
-                    logger.info("Grad-CAM generated: %s", gradcam_url)
-            except Exception as exc:
-                logger.warning("Grad-CAM generation failed: %s", exc)
+            gradcam_data = generate_gradcam_for_image(
+                model_manager,
+                target_path,
+                GRADCAM_MODEL,
+                django_settings.MEDIA_ROOT,
+                django_settings.MEDIA_URL,
+            )
 
-        # --- Selective Refusal ---
-        is_refused = False
-        if uncertainty_data and uncertainty_data.get("is_uncertain"):
-            is_refused = True
-            final_result["label"] = "Uncertain"
+        # 9. Refusal check
+        refusal = check_all_refusals(
+            confidence=confidence,
+            probabilities=final_result.get("probabilities", []),
+            predictions=predictions,
+            uncertainty_data=uncertainty_data,
+            use_ensemble=use_ensemble,
+        )
+
+        if refusal.is_refused:
+            final_result["label"] = refusal.label
             final_result["confidence"] = 0.0
             confidence = 0.0
             confidence_warning = "low"
-            logger.warning(f"Classification refused: uncertainty={uncertainty_data['entropy']:.4f} > threshold")
-        elif confidence < CONFIDENCE_THRESHOLD_REFUSE:
-            is_refused = True
-            final_result["label"] = "Uncertain"
-            final_result["confidence"] = 0.0
-            confidence = 0.0
-            confidence_warning = "low"
-            logger.warning(f"Classification refused: low confidence {confidence:.2f} < {CONFIDENCE_THRESHOLD_REFUSE}")
 
-        # OOD detection via normalized entropy of ensemble probabilities.
-        # OOD images produce near-uniform predictions (high entropy) even when
-        # the max confidence is above the refusal threshold. In-distribution
-        # fundus images have peaked distributions (low entropy).
-        if not is_refused and use_ensemble:
-            probs = final_result.get("probabilities")
-            if probs and len(probs) > 1:
-                from scipy.stats import entropy as scipy_entropy
-
-                norm_entropy = scipy_entropy(probs) / np.log(len(probs))
-                if norm_entropy > OOD_ENTROPY_THRESHOLD:
-                    is_refused = True
-                    final_result["label"] = "Uncertain"
-                    confidence = 0.0
-                    confidence_warning = "low"
-                    logger.warning(f"Classification refused: OOD entropy {norm_entropy:.4f} > {OOD_ENTROPY_THRESHOLD}")
-
-        # Top-1 / Top-2 margin check — OOD images have a narrow margin between
-        # the top class and the runner-up, while real fundus predictions have a
-        # clear winner.
-        if not is_refused and use_ensemble:
-            probs = final_result.get("probabilities")
-            if probs and len(probs) >= 2:
-                sorted_probs = sorted(probs, reverse=True)
-                margin = sorted_probs[0] / max(sorted_probs[1], 1e-8)
-                if margin < FUNDUS_MIN_TOP1_TOP2_RATIO:
-                    is_refused = True
-                    final_result["label"] = "Uncertain"
-                    confidence = 0.0
-                    confidence_warning = "low"
-                    logger.warning(
-                        f"Classification refused: top-1/top-2 margin {margin:.2f} < {FUNDUS_MIN_TOP1_TOP2_RATIO}"
-                    )
-
-        # Energy-based OOD detection — uses raw logits (before softmax).
-        # OOD images produce low-energy logits across ALL classes, even when
-        # the softmax-normalized top class seems confident. Energy score:
-        #   E(x) = log(sum(exp(logits_i)))
-        # Higher = in-distribution, Lower = OOD.
-        if not is_refused and use_ensemble:
-            all_logits = []
-            for _, pred in predictions:
-                logits = pred.get("logits")
-                if logits and len(logits) == len(CATEGORIES):
-                    all_logits.append(logits)
-            if len(all_logits) >= 2:
-                avg_logits = np.mean(all_logits, axis=0)
-                energy = np.log(np.sum(np.exp(avg_logits - np.max(avg_logits)))) + np.max(avg_logits)
-                n_classes = len(avg_logits)
-                # Normalize energy by the number of classes
-                # (higher n_classes = higher energy naturally)
-                energy_per_class = energy / n_classes
-                # In-distribution fundus images typically have energy_per_class > 0.8
-                if energy_per_class < 0.6:
-                    is_refused = True
-                    final_result["label"] = "Uncertain"
-                    confidence = 0.0
-                    confidence_warning = "low"
-                    logger.warning(f"Classification refused: low energy score {energy_per_class:.4f}")
-
+        # 10. Build result
         result = {
             "label": final_result["label"],
             "confidence": confidence,
@@ -368,22 +338,18 @@ def predict_image(
             "use_ensemble": use_ensemble,
             "use_tta": use_tta,
             "use_clahe": use_clahe,
-            "n_models": n_models_used,
+            "n_models": len(predictions) if predictions else 1,
             "preprocessing_viz_url": None,
+            "is_refused": refusal.is_refused,
         }
 
         if confidence_warning:
             result["confidence_warning"] = confidence_warning
-            result["confidence_message"] = (
-                "Low confidence. Result may be unreliable. Consider retaking the image with better lighting."
-                if confidence_warning == "low"
-                else "Medium confidence. Result is reasonably reliable."
-            )
+            result["confidence_message"] = confidence_message
 
         if "warnings" in final_result:
             result["warnings"] = final_result["warnings"]
 
-        # Uncertainty data
         if uncertainty_data:
             result["uncertainty"] = {
                 "entropy": uncertainty_data.get("entropy", 0.0),
@@ -391,25 +357,21 @@ def predict_image(
                 "n_passes": uncertainty_data.get("n_passes", 0),
             }
 
-        # Grad-CAM data
         if gradcam_data:
             result["gradcam_url"] = gradcam_data["url"]
 
-        # Selective refusal
-        if is_refused:
-            result["is_refused"] = True
-            result["refusal_message"] = UNCERTAINTY_REFUSAL_MESSAGE
-        else:
-            result["is_refused"] = False
+        if refusal.is_refused:
+            result["refusal_message"] = refusal.reason
 
         set_cache_entry(cache_key, result)
 
+        # Cleanup
         if preprocessed_path and os.path.exists(preprocessed_path):
             try:
                 os.remove(preprocessed_path)
-                logger.debug(f"Cleaned up preprocessed file: {preprocessed_path}")
+                logger.debug("Cleaned up preprocessed file: %s", preprocessed_path)
             except Exception as cleanup_error:
-                logger.warning(f"Failed to cleanup preprocessed file: {cleanup_error}")
+                logger.warning("Failed to cleanup preprocessed file: %s", cleanup_error)
 
         return result
 

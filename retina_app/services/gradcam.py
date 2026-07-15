@@ -247,3 +247,50 @@ def get_gradcam_output_path(media_root: str, image_name: str) -> str:
 
     base_name = os.path.splitext(os.path.basename(image_name))[0]
     return os.path.join(gradcam_dir, f"{base_name}_gradcam.png")
+
+
+def generate_gradcam_for_image(
+    model_manager,
+    image_path: str,
+    model_type: str,
+    media_root: str,
+    media_url: str,
+) -> dict[str, Any] | None:
+    """Generate Grad-CAM heatmap for a prediction.
+
+    High-level wrapper that handles model lookup, output path generation,
+    and error handling. Used by inference.py to keep it thin.
+
+    Args:
+        model_manager: ModelManager instance with loaded models
+        image_path: Path to the input image
+        model_type: Which model to use for Grad-CAM (e.g., "swin")
+        media_root: Django MEDIA_ROOT for saving output
+        media_url: Django MEDIA_URL for generating URL
+
+    Returns:
+        Dict with url, predicted_class, confidence or None on failure
+    """
+    if model_type not in model_manager._models:
+        logger.warning("Grad-CAM model %s not loaded, skipping", model_type)
+        return None
+
+    try:
+        gradcam_model = model_manager._models[model_type]
+        gradcam_output = get_gradcam_output_path(media_root, os.path.basename(image_path))
+        gradcam_result = generate_gradcam(
+            gradcam_model,
+            image_path,
+            model_type,
+            output_path=gradcam_output,
+        )
+        gradcam_url = f"{media_url}gradcam/{os.path.basename(gradcam_output)}"
+        logger.info("Grad-CAM generated: %s", gradcam_url)
+        return {
+            "url": gradcam_url,
+            "predicted_class": gradcam_result["predicted_class"],
+            "confidence": gradcam_result["confidence"],
+        }
+    except Exception as exc:
+        logger.warning("Grad-CAM generation failed: %s", exc)
+        return None
