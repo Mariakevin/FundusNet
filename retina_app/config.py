@@ -44,7 +44,7 @@ class AugmentationConfig:
 
 @dataclass
 class ModelConfig:
-    name: str = "convnext_v2"
+    name: str = "efficientnet_b0"
     num_classes: int = 4
     pretrained: bool = True
     drop_rate: float = 0.0

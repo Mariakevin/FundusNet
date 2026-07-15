@@ -28,6 +28,7 @@ GRADCAM_TARGET_LAYERS = {
     "convnext_v2": "features",
     "efficientnet_v2": "features",
     "deit": "encoder",
+    "efficientnet_b0": "features",
 }
 
 
@@ -47,6 +48,9 @@ def _get_target_layer(model: nn.Module, model_type: str) -> nn.Module:
     elif model_type == "deit":
         if hasattr(model, "encoder"):
             return model.encoder
+    elif model_type == "efficientnet_b0":
+        if hasattr(model, "features"):
+            return model.features[-1]
 
     # Fallback: auto-detect
     if hasattr(model, "features"):

@@ -303,13 +303,19 @@ def predict_image(
         # 8. Grad-CAM
         gradcam_data = None
         if use_gradcam:
-            gradcam_data = generate_gradcam_for_image(
-                model_manager,
-                target_path,
-                GRADCAM_MODEL,
-                django_settings.MEDIA_ROOT,
-                django_settings.MEDIA_URL,
-            )
+            # Skip Grad-CAM for ONNX models (no autograd support)
+            model_type_str = model_manager._model_types.get(GRADCAM_MODEL)
+            if model_type_str == "onnx":
+                logger.info("Skipping Grad-CAM for ONNX model (no autograd support)")
+                gradcam_data = None
+            else:
+                gradcam_data = generate_gradcam_for_image(
+                    model_manager,
+                    target_path,
+                    GRADCAM_MODEL,
+                    django_settings.MEDIA_ROOT,
+                    django_settings.MEDIA_URL,
+                )
 
         # 9. Refusal check
         refusal = check_all_refusals(

@@ -14,26 +14,17 @@ FUNDUS_MIN_TOP1_TOP2_RATIO = 1.8
 CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
 
 # --- Model Configuration ---
-# 6-model ensemble: pre-trained EfficientNet-B0 (95% acc) + dual-branch (CNN + Transformer) + hybrid architectures
-MODEL_LIST = ["efficientnet_b0", "swin", "maxvit", "convnext_v2", "efficientnet_v2", "deit"]
+# Single trained model: EfficientNet-B0 pre-trained on exact 4-class retinal disease dataset
+# Other models disabled until trained weights are available
+MODEL_LIST = ["efficientnet_b0"]
 
 MODEL_WEIGHTS = {
-    "efficientnet_b0": 0.50,   # Pre-trained on exact 4-class dataset (95% acc)
-    "swin": 0.10,
-    "maxvit": 0.10,
-    "convnext_v2": 0.10,
-    "efficientnet_v2": 0.10,
-    "deit": 0.10,
+    "efficientnet_b0": 1.0,  # Only trained model (95% acc on exact 4-class dataset)
 }
 
 # Mapping from short names to timm model identifiers
 MODEL_NAME_MAP = {
-    "efficientnet_b0": "efficientnet_b0",  # Not a timm model, but placeholder
-    "swin": "swin_tiny_patch4_window7_224",
-    "maxvit": "maxvit_base_tf_224",
-    "convnext_v2": "convnextv2_base",
-    "efficientnet_v2": "efficientnet_b3",
-    "deit": "deit3_base_patch16_224",
+    "efficientnet_b0": "efficientnet_b0",
 }
 
 # Per-model label mapping for ONNX models with non-standard class ordering
@@ -43,13 +34,13 @@ MODEL_LABEL_MAP = {
 }
 
 CLASS_PERFORMANCE_WEIGHTS = {
-    "Healthy": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
-    "Cataract": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
-    "Glaucoma": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
-    "Retina Disease": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
+    "Healthy": {"efficientnet_b0": 1.0},
+    "Cataract": {"efficientnet_b0": 1.0},
+    "Glaucoma": {"efficientnet_b0": 1.0},
+    "Retina Disease": {"efficientnet_b0": 1.0},
 }
 
-ENSEMBLE_MIN_MODELS = 2
+ENSEMBLE_MIN_MODELS = 1
 MAX_WORKERS = 4
 
 # --- Pretrained Model Fallback ---
@@ -117,7 +108,7 @@ ADAPTER_DIMENSION = 64
 ADAPTER_DROPOUT = 0.1
 
 # --- Grad-CAM Explainability ---
-GRADCAM_MODEL = "swin"
+GRADCAM_MODEL = "efficientnet_b0"
 GRADCAM_ALPHA = 0.5
 GRADCAM_COLORMAP = "jet"
 

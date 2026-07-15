@@ -34,11 +34,6 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 MODEL_VERSIONS = {
     "efficientnet_b0": "efficientnetb0-shifaa-eye-v1",
-    "swin": "swin-tiny-retinopathy-v1",
-    "maxvit": "maxvit-base-retinopathy-v1",
-    "convnext_v2": "convnextv2-base-retinopathy-v1",
-    "efficientnet_v2": "efficientnetv2-m-retinopathy-v1",
-    "deit": "deit3-base-retinopathy-v1",
 }
 
 MODEL_PATHS: dict[str, str] | None = None
@@ -61,11 +56,6 @@ def _get_model_paths() -> dict[str, str]:
     models_dir = os.path.join(settings.BASE_DIR, "models")
     return {
         "efficientnet_b0": os.path.join(models_dir, "efficientnet_b0_retinopathy.onnx"),
-        "swin": os.path.join(models_dir, "swin_retinopathy.onnx"),
-        "maxvit": os.path.join(models_dir, "maxvit_retinopathy.onnx"),
-        "convnext_v2": os.path.join(models_dir, "convnext_v2_retinopathy.onnx"),
-        "efficientnet_v2": os.path.join(models_dir, "efficientnet_v2_retinopathy.onnx"),
-        "deit": os.path.join(models_dir, "deit_retinopathy.onnx"),
     }
 
 
@@ -76,11 +66,6 @@ def _get_pytorch_model_paths() -> dict[str, str]:
     models_dir = os.path.join(settings.BASE_DIR, "models")
     return {
         "efficientnet_b0": os.path.join(models_dir, "efficientnet_b0_retinopathy.pth"),
-        "swin": os.path.join(models_dir, "swin_retinopathy.pth"),
-        "maxvit": os.path.join(models_dir, "maxvit_retinopathy.pth"),
-        "convnext_v2": os.path.join(models_dir, "convnext_v2_retinopathy.pth"),
-        "efficientnet_v2": os.path.join(models_dir, "efficientnet_v2_retinopathy.pth"),
-        "deit": os.path.join(models_dir, "deit_retinopathy.pth"),
     }
 
 
@@ -247,7 +232,7 @@ class ModelManager:
         self._models: dict[str, nn.Module] = {}
         self._model_types: dict[str, str] = {}
 
-    def get_model(self, model_type: str = "convnext_v2") -> nn.Module:
+    def get_model(self, model_type: str = "efficientnet_b0") -> nn.Module:
         """Load and return a specific model."""
         if model_type not in self._models:
             self._models[model_type] = self._load_model(model_type)
