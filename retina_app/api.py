@@ -18,11 +18,14 @@ import os
 import tempfile
 import threading
 import time
+import uuid
 
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+
+from retina_app.constants import ALLOWED_MIME_TYPES, MAX_FILE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -80,18 +83,14 @@ class FileRateLimiter:
         self.window_seconds = window_seconds
         self._dir = os.path.join(tempfile.gettempdir(), "fundusnet_ratelimit")
         os.makedirs(self._dir, exist_ok=True)
-        self._local = threading.local()
+        self._global_lock = threading.Lock()
 
     def _get_file(self, key: str) -> str:
         safe = hashlib.md5(key.encode()).hexdigest()
         return os.path.join(self._dir, f"{safe}.json")
 
     def _get_lock(self, key: str) -> threading.Lock:
-        if not hasattr(self._local, "locks"):
-            self._local.locks = {}
-        if key not in self._local.locks:
-            self._local.locks[key] = threading.Lock()
-        return self._local.locks[key]
+        return self._global_lock
 
     def _read_timestamps(self, filepath: str) -> list[float]:
         try:
@@ -219,16 +218,15 @@ def predict_single(request):
     image_file = request.FILES["image"]
 
     # Validate file
-    if image_file.size > 10 * 1024 * 1024:
+    if image_file.size > MAX_FILE_SIZE:
         return JsonResponse({"error": "File too large (max 10MB)"}, status=400)
 
-    allowed_types = ["image/jpeg", "image/png", "image/bmp", "image/webp", "image/tiff"]
-    if image_file.content_type not in allowed_types:
+    if image_file.content_type not in ALLOWED_MIME_TYPES:
         return JsonResponse({"error": "Invalid file type. Use JPG, PNG, BMP, WEBP, or TIFF."}, status=400)
 
-    # Save temp file
+    # Save temp file with UUID to avoid race condition
     ext = os.path.splitext(image_file.name)[1]
-    tmp_path = os.path.join(settings.MEDIA_ROOT, f"api_upload_{int(time.time())}{ext}")
+    tmp_path = os.path.join(settings.MEDIA_ROOT, f"api_upload_{uuid.uuid4().hex[:12]}{ext}")
 
     try:
         with open(tmp_path, "wb") as f:
@@ -260,7 +258,7 @@ def predict_single(request):
         )
 
     except Exception as e:
-        logger.error(f"API prediction failed: {e}")
+        logger.error("API prediction failed: %s", e)
         return JsonResponse({"error": str(e)}, status=500)
 
     finally:
@@ -367,9 +365,15 @@ def model_health(request):
     tracker = get_health_tracker()
     health = tracker.get_all_health()
 
+    overall_status = "healthy"
+    for model_name, model_health in health.items():
+        if isinstance(model_health, dict) and model_health.get("status") != "healthy":
+            overall_status = "degraded"
+            break
+
     return JsonResponse(
         {
-            "status": "healthy",
+            "status": overall_status,
             "models": health,
             "timestamp": time.time(),
         }

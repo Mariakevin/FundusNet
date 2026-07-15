@@ -8,10 +8,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
-try:
-    from retina_app.constants import CATEGORIES, MODEL_NAME_MAP
-except ImportError:
-    CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
+from retina_app.constants import CATEGORIES, MODEL_NAME_MAP
 
 CLASS_TO_IDX = {cat: idx for idx, cat in enumerate(CATEGORIES)}
 

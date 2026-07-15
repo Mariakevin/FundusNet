@@ -81,7 +81,7 @@ USE_TZ = True
 # Static files
 STATIC_URL = "static/"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Retention policy: delete images older than this (days)
 MEDIA_RETENTION_DAYS = int(os.getenv("MEDIA_RETENTION_DAYS", "90"))

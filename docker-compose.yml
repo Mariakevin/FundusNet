@@ -6,9 +6,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=0
-      - SECRET_KEY=change-me-in-production
-      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - DJANGO_DEBUG=False
+      - DJANGO_SECRET_KEY=change-me-in-production
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
     volumes:
       - ./models:/app/models
       - ./media:/app/media

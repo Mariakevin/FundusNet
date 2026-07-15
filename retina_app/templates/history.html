@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Prediction History — FundusNet{% endblock %}
 {% block content %}
-<a href="/" class="skip-link">Skip to main content</a>
 <div class="retina-page">
   <header class="retina-header" role="banner">
     <a href="/" class="retina-brand" aria-label="FundusNet home">
@@ -70,10 +69,14 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  var toggle = document.getElementById('dark-mode-toggle');
-  var html = document.documentElement;
-  var saved = localStorage.getItem('fundusnet-theme');
-  if (saved === 'dark') html.classList.add('dark-mode');
+  const toggle = document.getElementById('dark-mode-toggle');
+  const html = document.documentElement;
+  const saved = localStorage.getItem('fundusnet-theme');
+  if (saved === 'dark') {
+    html.classList.add('dark-mode');
+  } else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.classList.add('dark-mode');
+  }
   if (toggle) {
     toggle.addEventListener('click', function() {
       html.classList.toggle('dark-mode');

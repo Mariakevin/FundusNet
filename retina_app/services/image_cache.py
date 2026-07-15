@@ -28,9 +28,10 @@ def _get_image_hash(image_path: str) -> str:
 
 
 def get_cache_entry(cache_key: str) -> dict[str, Any] | None:
-    """Retrieve an item from cache. Returns None on miss."""
+    """Retrieve an item from cache. Returns None on miss. Moves to end (most recently used)."""
     with _cache_lock:
         if cache_key in IMAGE_CACHE:
+            IMAGE_CACHE.move_to_end(cache_key)
             return IMAGE_CACHE[cache_key]
     return None
 
@@ -76,7 +77,7 @@ def clear_image_cache() -> dict[str, int]:
         count = len(IMAGE_CACHE)
         IMAGE_CACHE.clear()
         _cache_memory_bytes = 0
-        logger.info(f"Cleared {count} items from image cache")
+        logger.info("Cleared %d items from image cache", count)
         return {"cleared_items": count, "cache_size": count}
 
 

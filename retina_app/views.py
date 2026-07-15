@@ -12,7 +12,7 @@ from django.core.files.storage import default_storage
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from .constants import CATEGORIES
+from .constants import ALLOWED_EXTENSIONS, ALLOWED_MIME_TYPES, CATEGORIES, MAX_FILE_SIZE
 from .forms import ImageUploadForm
 from .models import PredictionRecord, UploadedImage
 from .services.exceptions import (
@@ -63,6 +63,13 @@ def index_view(request: HttpRequest) -> HttpResponse:
                     "refusal_message": prediction_data.get("refusal_message", ""),
                     "preprocessing_viz_url": prediction_data.get("preprocessing_viz_url"),
                 }
+
+                PredictionRecord.objects.create(
+                    uploaded_image=uploaded_image,
+                    predicted_class=prediction_data["label"],
+                    confidence=prediction_data["confidence"],
+                    model_version=prediction_data["model_version"],
+                )
             except InferenceError as exc:
                 error_message = f"Analysis failed: {str(exc)}"
             except (ImageValidationError, ImageCorruptError, ImageSizeError, ImageDimensionError) as exc:
@@ -119,7 +126,17 @@ def protected_media(request: HttpRequest, path: str) -> HttpResponse:
 def history_view(request: HttpRequest) -> HttpResponse:
     """Show recent prediction history."""
     records = PredictionRecord.objects.filter(is_deleted=False).order_by("-created_at")[:20]
-    return render(request, "history.html", {"records": records})
+    records_data = [
+        {
+            "id": r.id,
+            "predicted_class": r.predicted_class,
+            "confidence": r.confidence * 100,
+            "model_version": r.model_version,
+            "created_at": r.created_at,
+        }
+        for r in records
+    ]
+    return render(request, "history.html", {"records": records_data})
 
 
 def export_view(request: HttpRequest, record_id: int) -> HttpResponse:
@@ -168,21 +185,38 @@ def batch_view(request: HttpRequest) -> HttpResponse:
             error_message = "Maximum 100 images per batch."
         else:
             for f in files:
+                ext = os.path.splitext(f.name)[1].lower()
+                if ext not in ALLOWED_EXTENSIONS:
+                    results.append({"filename": f.name, "error": f"Invalid file type: {ext}", "success": False})
+                    continue
+                if f.size > MAX_FILE_SIZE:
+                    results.append({"filename": f.name, "error": "File too large (max 10MB)", "success": False})
+                    continue
+                if f.content_type and f.content_type not in ALLOWED_MIME_TYPES:
+                    results.append({"filename": f.name, "error": f"Invalid MIME type: {f.content_type}", "success": False})
+                    continue
+
                 uploaded = UploadedImage.objects.create(image=f)
                 image_path = os.path.join(settings.MEDIA_ROOT, uploaded.image.name)
                 try:
                     prediction_data = predict_image(image_path, use_ensemble=True, use_gradcam=False)
+                    PredictionRecord.objects.create(
+                        uploaded_image=uploaded,
+                        predicted_class=prediction_data["label"],
+                        confidence=prediction_data["confidence"],
+                        model_version=prediction_data["model_version"],
+                    )
                     results.append({
                         "filename": f.name,
                         "label": prediction_data["label"],
                         "confidence": prediction_data["confidence"] * 100,
                         "success": True,
                     })
+                except (InferenceError, ImageValidationError, ImageCorruptError, ImageSizeError,
+                        ImageDimensionError, ModelLoadError, PreprocessingError, NotAFundusImageError) as exc:
+                    results.append({"filename": f.name, "error": str(exc), "success": False})
                 except Exception as exc:
-                    results.append({
-                        "filename": f.name,
-                        "error": str(exc),
-                        "success": False,
-                    })
+                    logger.error("Batch prediction failed for %s: %s", f.name, exc)
+                    results.append({"filename": f.name, "error": "Unexpected error", "success": False})
 
     return render(request, "batch.html", {"results": results, "error_message": error_message})

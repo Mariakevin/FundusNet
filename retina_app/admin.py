@@ -10,6 +10,8 @@ class UploadedImageAdmin(admin.ModelAdmin):
     search_fields = ("user__username",)
     list_select_related = ("user",)
     date_hierarchy = "uploaded_at"
+    readonly_fields = ("uploaded_at",)
+    list_per_page = 25
 
 
 @admin.register(PredictionRecord)
@@ -19,3 +21,5 @@ class PredictionRecordAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "predicted_class", "model_version")
     list_select_related = ("user", "uploaded_image")
     date_hierarchy = "created_at"
+    readonly_fields = ("created_at",)
+    list_per_page = 25

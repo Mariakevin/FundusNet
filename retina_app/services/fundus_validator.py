@@ -372,7 +372,6 @@ def validate_fundus_image(image_path: str, pil_image=None) -> dict[str, Any]:
     """
     # Use pre-loaded image or read from disk
     if pil_image is not None:
-        import numpy as np
         image = np.array(pil_image)
         if len(image.shape) == 2:
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)

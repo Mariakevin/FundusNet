@@ -7,7 +7,7 @@ WORKDIR /app
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,8 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Application code
 COPY . .
 
-# Run migrations and collect static
-RUN python manage.py migrate --noinput 2>/dev/null || true
+# Collect static files (migrations run at startup)
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 
 # Set ownership
@@ -35,5 +34,5 @@ USER appuser
 
 EXPOSE 8000
 
-# Use gunicorn config file
-CMD ["gunicorn", "-c", "gunicorn.conf.py", "retina_project.wsgi:application"]
+# Run migrations at startup, then start gunicorn
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn -c gunicorn.conf.py retina_project.wsgi:application"]

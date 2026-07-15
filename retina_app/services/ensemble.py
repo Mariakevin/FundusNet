@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from PIL import Image
 
 
 class RestrictedUnpickler(pickle.Unpickler):
@@ -41,7 +42,6 @@ def safe_load_pickle(path: str):
     """Load pickle file with restricted unpickler to prevent code execution."""
     with open(path, "rb") as f:
         return RestrictedUnpickler(f).load()
-from PIL import Image
 
 from retina_app.constants import (
     CATEGORIES,
@@ -176,8 +176,6 @@ def get_learnable_fusion():
     """Get or create learnable fusion singleton."""
     global _learnable_fusion
     if _learnable_fusion is None:
-        from retina_app.constants import CATEGORIES
-
         _learnable_fusion = LearnableFusion(
             n_models=len(MODEL_LIST),
             n_classes=len(CATEGORIES),
@@ -192,7 +190,7 @@ def get_learnable_fusion():
                 _learnable_fusion.to(DEVICE)
                 logger.info("Loaded learnable fusion from disk")
             except Exception as e:
-                logger.warning(f"Failed to load learnable fusion: {e}")
+                logger.warning("Failed to load learnable fusion: %s", e)
     return _learnable_fusion
 
 
@@ -268,7 +266,7 @@ class StackingMetaLearner:
                 optimizer.step()
 
         self._is_trained = True
-        logger.info(f"Stacking meta-learner trained: {self.meta_learner_type}, {n_features} features")
+        logger.info("Stacking meta-learner trained: %s, %d features", self.meta_learner_type, n_features)
 
     def predict(self, model_probs_dict):
         """Predict using trained meta-learner.
@@ -312,7 +310,7 @@ class StackingMetaLearner:
 
         with open(path, "wb") as f:
             pickle.dump(data, f)
-        logger.info(f"Stacking meta-learner saved to {path}")
+        logger.info("Stacking meta-learner saved to %s", path)
 
     @classmethod
     def load(cls, path):
@@ -354,7 +352,7 @@ def get_meta_learner():
                 _meta_learner = StackingMetaLearner.load(model_path)
                 logger.info("Loaded stacking meta-learner from disk")
             except Exception as e:
-                logger.warning(f"Failed to load meta-learner: {e}")
+                logger.warning("Failed to load meta-learner: %s", e)
                 _meta_learner = StackingMetaLearner(
                     meta_learner_type=STACKING_META_LEARNER,
                     n_classes=len(CATEGORIES),
@@ -423,7 +421,7 @@ def _predict_single_model(model, image_path, use_tta=False):
             # Uncertainty-aware aggregation (BayTTA-inspired)
             if UNCERTAINTY_AWARE_TTA_ENABLED and tta_uncertainty > UNCERTAINTY_THRESHOLD:
                 # High variance → weight predictions inversely to their variance
-                logger.debug(f"High TTA variance: {tta_uncertainty:.4f}, using uncertainty-aware aggregation")
+                logger.debug("High TTA variance: %.4f, using uncertainty-aware aggregation", tta_uncertainty)
 
                 # Weight by inverse variance (lower variance = higher weight)
                 weights = [1.0 / (np.var(p) + 1e-6) for p in all_probs]
@@ -517,7 +515,7 @@ def predict_models_parallel(models, image_path, use_tta, executor):
         if pred is not None:
             predictions.append((model_type, pred))
         else:
-            logger.warning(f"Model {model_type} prediction failed: {error}")
+            logger.warning("Model %s prediction failed: %s", model_type, error)
 
     if not predictions:
         raise InferenceError("All models failed to make predictions")
@@ -560,13 +558,13 @@ def ensemble_predictions(predictions):
                         "method": "stacking",
                     }
             except Exception as exc:
-                logger.warning(f"Stacking meta-learner failed, falling back to weighted averaging: {exc}")
+                logger.warning("Stacking meta-learner failed, falling back to weighted averaging: %s", exc)
 
     # Try learnable fusion (Res101-MViT-Ens inspired)
     if LEARNABLE_FUSION_ENABLED:
         try:
             fusion = get_learnable_fusion()
-            if fusion is not None and fusion.training:
+            if fusion is not None:
                 model_probs_list = []
                 model_confidences = []
 
@@ -606,7 +604,7 @@ def ensemble_predictions(predictions):
                     "method": "learnable_fusion",
                 }
         except Exception as exc:
-            logger.debug(f"Learnable fusion not available, falling back to weighted averaging: {exc}")
+            logger.debug("Learnable fusion not available, falling back to weighted averaging: %s", exc)
 
     # Fallback: per-class dynamic weighted averaging
     weighted_probs = [0.0] * n_classes

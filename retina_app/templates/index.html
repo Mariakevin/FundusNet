@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block title %}FundusNet — AI-Powered Retinal Screening{% endblock %}
 {% block content %}
-<a href="#main-content" class="skip-link">Skip to main content</a>
 <div class="retina-page">
 
   <header class="retina-header" role="banner">
@@ -225,10 +224,10 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  /* ── Dark mode toggle ── */
-  var toggle = document.getElementById('dark-mode-toggle');
-  var html = document.documentElement;
-  var savedTheme = localStorage.getItem('fundusnet-theme');
+  /* Dark mode toggle */
+  const toggle = document.getElementById('dark-mode-toggle');
+  const html = document.documentElement;
+  const savedTheme = localStorage.getItem('fundusnet-theme');
   if (savedTheme === 'dark') {
     html.classList.add('dark-mode');
   } else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -238,23 +237,23 @@ document.addEventListener('DOMContentLoaded', function() {
   if (toggle) {
     toggle.addEventListener('click', function() {
       html.classList.toggle('dark-mode');
-      var isDark = html.classList.contains('dark-mode');
+      const isDark = html.classList.contains('dark-mode');
       localStorage.setItem('fundusnet-theme', isDark ? 'dark' : 'light');
       toggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
     });
   }
 
-  /* ── Upload handling ── */
-  var fileInput = document.getElementById('id_image');
-  var zone = document.getElementById('dropzone');
-  var preview = document.getElementById('preview-container');
-  var placeholder = document.getElementById('dropzone-placeholder');
-  var imgPreview = document.getElementById('image-preview');
-  var submitBtn = document.getElementById('submit-btn');
+  /* Upload handling */
+  const fileInput = document.getElementById('id_image');
+  const zone = document.getElementById('dropzone');
+  const preview = document.getElementById('preview-container');
+  const placeholder = document.getElementById('dropzone-placeholder');
+  const imgPreview = document.getElementById('image-preview');
+  const submitBtn = document.getElementById('submit-btn');
 
   if (fileInput) {
-    var MAX_SIZE = 10 * 1024 * 1024;
-    var ALLOWED = ['image/jpeg', 'image/png', 'image/bmp', 'image/webp', 'image/tiff'];
+    const MAX_SIZE = 10 * 1024 * 1024;
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/bmp', 'image/webp', 'image/tiff'];
 
     function validateFile(file) {
       if (!file) return false;
@@ -265,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleFile(file) {
       if (!validateFile(file)) return;
-      var reader = new FileReader();
+      const reader = new FileReader();
       reader.onload = function(e) {
         imgPreview.src = e.target.result;
         placeholder.style.display = 'none';
@@ -299,11 +298,11 @@ document.addEventListener('DOMContentLoaded', function() {
       submitBtn.disabled = true;
       submitBtn.classList.add('retina-btn-loading');
       /* Start elapsed timer */
-      var elapsed = 0;
-      var timerEl = document.getElementById('analysis-timer');
+      let elapsed = 0;
+      const timerEl = document.getElementById('analysis-timer');
       if (timerEl) {
         timerEl.classList.remove('hidden');
-        var interval = setInterval(function() {
+        const interval = setInterval(function() {
           elapsed++;
           timerEl.textContent = elapsed + 's';
         }, 1000);
@@ -312,12 +311,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  /* ── Animate probability bars on result page ── */
-  var bars = document.querySelectorAll('.retina-prob-fill');
+  /* Animate probability bars on result page */
+  const bars = document.querySelectorAll('.retina-prob-fill');
   if (bars.length) {
     setTimeout(function() {
-      for (var i = 0; i < bars.length; i++) {
-        var width = bars[i].getAttribute('data-width');
+      for (let i = 0; i < bars.length; i++) {
+        const width = bars[i].getAttribute('data-width');
         if (width) {
           bars[i].style.setProperty('--target-width', width + '%');
           bars[i].classList.add('retina-prob-fill-animated');

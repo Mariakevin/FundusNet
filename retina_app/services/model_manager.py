@@ -105,10 +105,10 @@ def _load_onnx_session(model_type: str):
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
             session = ort.InferenceSession(onnx_path, providers=providers)
             _ort_sessions[model_type] = session
-            logger.info(f"Loaded ONNX session for {model_type} from {onnx_path}")
+            logger.info("Loaded ONNX session for %s from %s", model_type, onnx_path)
             return session
         except Exception as e:
-            logger.warning(f"Failed to load ONNX for {model_type}: {e}")
+            logger.warning("Failed to load ONNX for %s: %s", model_type, e)
     return None
 
 
@@ -144,7 +144,7 @@ def _run_onnx_inference(model_type: str, tensor: torch.Tensor) -> dict[str, Any]
             "model": model_type,
         }
     except Exception as e:
-        logger.warning(f"ONNX inference failed for {model_type}: {e}")
+        logger.warning("ONNX inference failed for %s: %s", model_type, e)
         return None
 
 
@@ -187,7 +187,7 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> tuple[nn.Mo
                 if saved_type == model_type:
                     model.load_state_dict(checkpoint["model_state_dict"], strict=False)
                     checkpoint_loaded = True
-                    logger.info(f"Loaded full checkpoint for {model_type}")
+                    logger.info("Loaded full checkpoint for %s", model_type)
                 else:
                     compatible_features, model_state = _load_checkpoint_features(checkpoint, model)
                     if len(compatible_features) > 10:
@@ -195,7 +195,7 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> tuple[nn.Mo
                         model.load_state_dict(model_state, strict=False)
                         checkpoint_loaded = True
                         logger.info(
-                            f"Loaded {len(compatible_features)} compatible layers from checkpoint for {model_type}"
+                            "Loaded %d compatible layers from checkpoint for %s", len(compatible_features), model_type
                         )
             else:
                 compatible_features, model_state = _load_checkpoint_features(checkpoint, model)
@@ -203,9 +203,9 @@ def _load_model_with_checkpoint(model_type: str, model_path: str) -> tuple[nn.Mo
                     model_state.update(compatible_features)
                     model.load_state_dict(model_state, strict=False)
                     checkpoint_loaded = True
-                    logger.info(f"Loaded {len(compatible_features)} compatible layers from checkpoint for {model_type}")
+                    logger.info("Loaded %d compatible layers from checkpoint for %s", len(compatible_features), model_type)
         except Exception as e:
-            logger.warning(f"Could not load checkpoint for {model_type}: {e}")
+            logger.warning("Could not load checkpoint for %s: %s", model_type, e)
 
     return model, checkpoint_loaded, in_features
 
@@ -251,7 +251,7 @@ class ModelManager:
         if _ort_available:
             session = _load_onnx_session(model_type)
             if session is not None:
-                logger.info(f"Using ONNX runtime for {model_type}")
+                logger.info("Using ONNX runtime for %s", model_type)
                 self._model_types[model_type] = "onnx"
                 return _OnnxModelWrapper(model_type, session)
 
@@ -261,20 +261,20 @@ class ModelManager:
             model_path = pytorch_paths.get(model_type, "")
             model, checkpoint_loaded, _ = _load_model_with_checkpoint(model_type, model_path)
             if not checkpoint_loaded:
-                logger.warning(f"No valid checkpoint for {model_type}, falling back to ImageNet pretrained")
+                logger.warning("No valid checkpoint for %s, falling back to ImageNet pretrained", model_type)
                 return self._load_pretrained(model_type)
             model.to(DEVICE)
             model.eval()
             self._model_types[model_type] = "trained"
-            logger.info(f"Loaded {model_type} model (trained)")
+            logger.info("Loaded %s model (trained)", model_type)
             return model
         except Exception as exc:
-            logger.warning(f"Failed to create {model_type} model: {exc}")
+            logger.warning("Failed to create %s model: %s", model_type, exc)
             return self._load_pretrained(model_type)
 
     def _load_pretrained(self, model_type: str) -> nn.Module:
         """Load pre-trained model with timm."""
-        logger.info(f"Loading pre-trained {model_type} for demo")
+        logger.info("Loading pre-trained %s for demo", model_type)
         model = _create_timm_model(model_type, num_classes=len(CATEGORIES), pretrained=True)
         if model is None:
             raise ValueError(f"Unknown model type: {model_type}")
@@ -290,7 +290,7 @@ class ModelManager:
             result = _run_onnx_inference(model_type, tensor)
             if result:
                 return result
-            logger.warning(f"ONNX inference failed for {model_type}, falling back to PyTorch")
+            logger.warning("ONNX inference failed for %s, falling back to PyTorch", model_type)
 
         # Fallback to PyTorch
         model = self.get_model(model_type)
@@ -316,7 +316,7 @@ class ModelManager:
                     "model": model_type,
                 }
         except Exception as e:
-            logger.warning(f"PyTorch inference failed for {model_type}: {e}")
+            logger.warning("PyTorch inference failed for %s: %s", model_type, e)
             return None
 
     def reload(self) -> None:

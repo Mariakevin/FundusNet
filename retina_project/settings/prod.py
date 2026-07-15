@@ -50,8 +50,8 @@ PERMISSIONS_POLICY = {
 
 # Content Security Policy
 CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://unpkg.com")
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com")
+CSP_SCRIPT_SRC = ("'self'", "https://unpkg.com")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://fonts.googleapis.com")
 CSP_FONT_SRC = ("'self'", "https://fonts.gstatic.com")
 CSP_IMG_SRC = ("'self'", "data:")
 CSP_CONNECT_SRC = ("'self'",)

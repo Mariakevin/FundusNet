@@ -226,7 +226,7 @@ def generate_gradcam(
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             blended_bgr = cv2.cvtColor(blended, cv2.COLOR_RGB2BGR)
             cv2.imwrite(output_path, blended_bgr)
-            logger.info(f"Grad-CAM saved to {output_path}")
+            logger.info("Grad-CAM saved to %s", output_path)
 
         return {
             "predicted_class": CATEGORIES[pred_idx],

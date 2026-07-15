@@ -22,7 +22,14 @@ try:
 except Exception:
     CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
 
-from train import create_model
+try:
+    from retina_app.utils import create_model
+except ImportError:
+    def create_model(model_name, num_classes=4, pretrained=True):
+        import timm
+        from retina_app.constants import MODEL_NAME_MAP
+        timm_name = MODEL_NAME_MAP.get(model_name, model_name)
+        return timm.create_model(timm_name, pretrained=pretrained, num_classes=num_classes)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 

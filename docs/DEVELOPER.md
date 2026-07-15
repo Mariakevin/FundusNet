@@ -8,43 +8,47 @@ Internal documentation for FundusNet development and maintenance.
 
 ```
 retina_project/
-├── retina_app/               # Main Django application
-│   ├── ml/                   # ML utilities (registry only)
-│   ├── services/             # Core services
-│   │   ├── inference.py      # Inference orchestrator
-│   │   ├── ensemble.py       # Multi-model ensemble + uncertainty
-│   │   ├── model_manager.py  # ONNX model loading
-│   │   ├── preprocessing.py  # Image preprocessing
-│   │   ├── fundus_validator.py # Fundus image validation
-│   │   ├── gradcam.py        # Grad-CAM explainability
-│   │   ├── image_cache.py    # Result caching
-│   │   └── exceptions.py     # Custom exceptions
-│   ├── static/
-│   │   └── retina_app/
-│   │       ├── medical.css   # Frontend styles
-│   │       └── medical.js    # Frontend JavaScript
-│   ├── templates/            # HTML templates
-│   ├── tests/                # Test suite
-│   ├── api.py                # REST API endpoints
-│   ├── constants.py          # Centralized configuration
-│   ├── models.py             # Database models
-│   ├── urls.py               # URL routing
-│   └── views.py              # View functions
-├── retina_project/           # Django project settings
-│   ├── settings/
-│   │   ├── base.py           # Base configuration
-│   │   ├── dev.py            # Development settings
-│   │   └── prod.py           # Production settings
-│   ├── urls.py               # Project URLs
-│   └── wsgi.py               # WSGI application
-├── docs/                     # Documentation
-├── models/                   # ONNX model files (gitignored)
-├── media/                    # Uploaded files (runtime)
-├── gunicorn.conf.py          # Gunicorn configuration
-├── Dockerfile                # Docker configuration
-├── docker-compose.yml        # Docker Compose
-├── manage.py                 # Django management
-└── requirements.txt          # Python dependencies
+├── retina_app/                    # Main Django app
+│   ├── services/                  # ML services
+│   │   ├── inference.py           # Inference orchestrator
+│   │   ├── ensemble.py            # 5-model ensemble + stacking
+│   │   ├── model_manager.py       # ONNX model loading
+│   │   ├── preprocessing.py       # Image preprocessing pipeline
+│   │   ├── fundus_validator.py    # Fundus image validation
+│   │   ├── gradcam.py             # Grad-CAM explainability
+│   │   ├── uncertainty.py         # MC Dropout uncertainty
+│   │   ├── refusal.py             # Confidence-based refusal
+│   │   ├── image_cache.py         # LRU result caching
+│   │   ├── batch_inference.py     # Async batch processing
+│   │   └── exceptions.py          # Custom exceptions
+│   ├── ml/                        # ML utilities
+│   │   └── registry.py            # Model registry + experiment tracking
+│   ├── static/retina_app/
+│   │   └── medical.css            # Frontend styles
+│   ├── templates/                 # HTML templates
+│   │   ├── base.html
+│   │   ├── index.html
+│   │   ├── history.html
+│   │   ├── batch.html
+│   │   └── errors/                # Error pages (400, 403, 404, 500)
+│   ├── tests/                     # Test suite
+│   ├── api.py                     # REST API endpoints
+│   ├── views.py                   # Web views
+│   ├── models.py                  # Database models
+│   ├── constants.py               # Centralized configuration
+│   └── urls.py                    # URL routing
+├── retina_project/                # Django settings
+│   └── settings/
+│       ├── base.py                # Shared settings
+│       ├── dev.py                 # Development
+│       └── prod.py                # Production
+├── models/                        # ONNX model files (gitignored)
+├── media/                         # Uploaded files (runtime)
+├── docs/                          # Documentation
+├── gunicorn.conf.py               # Gunicorn config
+├── Dockerfile                     # Docker build
+├── docker-compose.yml             # Docker Compose
+└── requirements.txt               # Python dependencies
 ```
 
 ---
@@ -75,20 +79,16 @@ python manage.py migrate
 
 # Show migration status
 python manage.py showmigrations
-
-# Reset database
-python manage.py migrate retina_app zero
-python manage.py migrate
 ```
 
 ### Loading Models
 
 Place ONNX model files in `models/` directory:
-- `swin_retinopathy.onnx` - Swin Transformer
-- `maxvit_retinopathy.onnx` - MaxViT
-- `convnext_v2_retinopathy.onnx` - ConvNeXt V2
-- `efficientnet_v2_retinopathy.onnx` - EfficientNet V2
-- `deit_retinopathy.onnx` - DeiT III
+- `swin_retinopathy.onnx`
+- `maxvit_retinopathy.onnx`
+- `convnext_v2_retinopathy.onnx`
+- `efficientnet_v2_retinopathy.onnx`
+- `deit_retinopathy.onnx`
 
 ---
 
@@ -102,9 +102,6 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 # Set in environment
 export FUNDUSNET_API_KEYS="your-api-key-here"
-
-# Or in .env file
-FUNDUSNET_API_KEYS=your-api-key-here
 ```
 
 ### Using the API
@@ -163,13 +160,10 @@ coverage report
 |----------|---------|-------------|
 | `DJANGO_SECRET_KEY` | (required) | Django secret key |
 | `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Comma-separated allowed hosts |
-| `DJANGO_PRODUCTION` | `False` | Enable production mode |
+| `DJANGO_DEBUG` | `False` | Enable debug mode |
 | `FUNDUSNET_API_KEYS` | (empty) | Comma-separated API keys |
-| `FUNDUSNET_MEDIA_ROOT` | `media/` | Media storage path |
-| `FUNDUSNET_MODELS_DIR` | `models/` | ONNX models directory |
 | `GUNICORN_BIND` | `0.0.0.0:8000` | Gunicorn bind address |
 | `GUNICORN_WORKERS` | `cpu*2+1` | Number of workers |
-| `GUNICORN_THREADS` | `4` | Threads per worker |
 
 ---
 
@@ -177,10 +171,11 @@ coverage report
 
 All model configuration is centralized in `constants.py`:
 
-- `MODEL_LIST` - List of model names
-- `MODEL_WEIGHTS` - Ensemble weights
-- `MODEL_NAME_MAP` - Mapping to timm model identifiers
-- `CLASS_PERFORMANCE_WEIGHTS` - Per-class weights
+- `MODEL_LIST` — List of model names
+- `MODEL_WEIGHTS` — Ensemble weights (must sum to 1.0)
+- `MODEL_NAME_MAP` — Mapping to timm model identifiers
+- `CLASS_PERFORMANCE_WEIGHTS` — Per-class dynamic weights
+- `CATEGORIES` — Classification labels
 
 ---
 

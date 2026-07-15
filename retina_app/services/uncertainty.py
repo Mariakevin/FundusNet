@@ -121,7 +121,7 @@ def mc_dropout_ensemble(models, image_path, model_weights=None, n_passes=MC_DROP
             result["model_type"] = model_type
             all_model_results.append(result)
         except Exception as exc:
-            logger.warning(f"MC Dropout failed for {model_type}: {exc}")
+            logger.warning("MC Dropout failed for %s: %s", model_type, exc)
     if not all_model_results:
         return {
             "label": "Unknown",

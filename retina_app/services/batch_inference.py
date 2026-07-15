@@ -176,7 +176,7 @@ class BatchInferenceService:
                     try:
                         job.callback(job)
                     except Exception as e:
-                        logger.warning(f"Job callback failed: {e}")
+                        logger.warning("Job callback failed: %s", e)
 
                 logger.info(
                     f"Job {job.job_id} completed: {len(job.image_paths)} images in {time.time() - start_time:.2f}s"
@@ -186,14 +186,14 @@ class BatchInferenceService:
             except Exception as e:
                 if attempt < self.max_retries - 1:
                     wait_time = 2**attempt
-                    logger.warning(f"Job {job.job_id} attempt {attempt + 1} failed: {e}, retrying in {wait_time}s")
+                    logger.warning("Job %s attempt %d failed: %s, retrying in %ds", job.job_id, attempt + 1, e, wait_time)
                     time.sleep(wait_time)
                 else:
                     job.status = JobStatus.FAILED
                     job.error = str(e)
                     with self._lock:
                         self._stats["failed_jobs"] += 1
-                    logger.error(f"Job {job.job_id} failed after {self.max_retries} attempts: {e}")
+                    logger.error("Job %s failed after %d attempts: %s", job.job_id, self.max_retries, e)
 
     def _run_batch_inference(self, job: InferenceJob) -> dict:
         """Run inference on a batch of images."""
@@ -269,12 +269,13 @@ class BatchInferenceService:
         callback: Any = None,
     ) -> str:
         """Submit a batch inference job. Returns job_id."""
-        # Check cache first
         config = config or {}
         cached = self._cache.get(image_paths, config)
         if cached:
-            logger.info(f"Cache hit for batch of {len(image_paths)} images")
-            return cached.get("job_id", "cached")
+            logger.info("Cache hit for batch of %d images", len(image_paths))
+            cached_job_id = cached.get("job_id")
+            if cached_job_id:
+                return cached_job_id
 
         job_id = str(uuid.uuid4())[:8]
         job = InferenceJob(
@@ -291,7 +292,7 @@ class BatchInferenceService:
         with self._lock:
             self._stats["total_jobs"] += 1
 
-        logger.info(f"Submitted job {job_id}: {len(image_paths)} images, priority={priority}")
+        logger.info("Submitted job %s: %d images, priority=%d", job_id, len(image_paths), priority)
         return job_id
 
     def get_job_status(self, job_id: str) -> dict | None:
