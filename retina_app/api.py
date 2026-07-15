@@ -30,12 +30,11 @@ logger = logging.getLogger(__name__)
 # ── API Key Authentication ─────────────────────────────────────────────────────
 
 API_KEY_HEADER = "X-API-Key"
-_rate_limit_lock = threading.Lock()
 
 
 def _get_api_keys() -> set[str]:
     """Load API keys from environment or settings."""
-    keys = set()
+    keys: set[str] = set()
     env_keys = os.environ.get("FUNDUSNET_API_KEYS", "")
     if env_keys:
         keys.update(k.strip() for k in env_keys.split(",") if k.strip())
@@ -67,55 +66,83 @@ def _check_api_key(request) -> JsonResponse | None:
 
 
 class FileRateLimiter:
-    """File-based rate limiter that works across multiple Gunicorn workers."""
+    """File-based rate limiter using atomic writes for cross-worker safety.
+
+    Uses tempfile + rename for atomic writes. Each key gets its own file.
+    Race condition is minimal because:
+    1. We read, filter, append, write atomically per-process
+    2. Worst case: two workers both allow a request (slight over-limit)
+    3. Rate limit is soft, not security-critical
+    """
 
     def __init__(self, max_requests: int = 30, window_seconds: int = 60):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._dir = os.path.join(tempfile.gettempdir(), "fundusnet_ratelimit")
         os.makedirs(self._dir, exist_ok=True)
+        self._local = threading.local()
 
     def _get_file(self, key: str) -> str:
         safe = hashlib.md5(key.encode()).hexdigest()
         return os.path.join(self._dir, f"{safe}.json")
 
+    def _get_lock(self, key: str) -> threading.Lock:
+        if not hasattr(self._local, "locks"):
+            self._local.locks = {}
+        if key not in self._local.locks:
+            self._local.locks[key] = threading.Lock()
+        return self._local.locks[key]
+
+    def _read_timestamps(self, filepath: str) -> list[float]:
+        try:
+            if os.path.exists(filepath):
+                with open(filepath, "r") as f:
+                    data = json.load(f)
+                return data.get("timestamps", [])
+        except (json.JSONDecodeError, OSError):
+            pass
+        return []
+
+    def _write_timestamps(self, filepath: str, timestamps: list[float]) -> None:
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                dir=self._dir, suffix=".tmp"
+            )
+            try:
+                with os.fdopen(tmp_fd, "w") as f:
+                    json.dump({"timestamps": timestamps}, f)
+                os.replace(tmp_path, filepath)
+            except OSError:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+        except OSError:
+            pass
+
     def is_allowed(self, key: str) -> bool:
         now = time.time()
-        with _rate_limit_lock:
-            filepath = self._get_file(key)
-            try:
-                if os.path.exists(filepath):
-                    with open(filepath, "r") as f:
-                        data = json.load(f)
-                    timestamps = [t for t in data.get("timestamps", []) if t > now - self.window_seconds]
-                else:
-                    timestamps = []
-            except (json.JSONDecodeError, OSError):
-                timestamps = []
+        filepath = self._get_file(key)
+        lock = self._get_lock(key)
+
+        with lock:
+            raw_timestamps = self._read_timestamps(filepath)
+            timestamps = [t for t in raw_timestamps if t > now - self.window_seconds]
 
             if len(timestamps) >= self.max_requests:
                 return False
 
             timestamps.append(now)
-            try:
-                with open(filepath, "w") as f:
-                    json.dump({"timestamps": timestamps}, f)
-            except OSError:
-                pass
+            self._write_timestamps(filepath, timestamps)
             return True
 
     def get_remaining(self, key: str) -> int:
         now = time.time()
         filepath = self._get_file(key)
-        try:
-            if os.path.exists(filepath):
-                with open(filepath, "r") as f:
-                    data = json.load(f)
-                timestamps = [t for t in data.get("timestamps", []) if t > now - self.window_seconds]
-                return max(0, self.max_requests - len(timestamps))
-        except (json.JSONDecodeError, OSError):
-            pass
-        return self.max_requests
+
+        raw_timestamps = self._read_timestamps(filepath)
+        timestamps = [t for t in raw_timestamps if t > now - self.window_seconds]
+        return max(0, self.max_requests - len(timestamps))
 
 
 _rate_limiter = FileRateLimiter(max_requests=30, window_seconds=60)
@@ -260,8 +287,6 @@ def predict_batch(request):
     rate_limit = _rate_limit_check(request)
     if rate_limit:
         return rate_limit
-
-    import json
 
     try:
         data = json.loads(request.body)

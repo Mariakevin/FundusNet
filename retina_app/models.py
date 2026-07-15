@@ -28,6 +28,9 @@ class PredictionRecord(models.Model):
         indexes = [
             models.Index(fields=["-created_at"]),
             models.Index(fields=["predicted_class"]),
+            models.Index(fields=["confidence"]),
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["is_deleted", "-created_at"]),
         ]
 
     def __str__(self):

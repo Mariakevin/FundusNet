@@ -1,19 +1,73 @@
+# Version control
+.git
+.gitignore
+
+# Python
 __pycache__
 *.pyc
 *.pyo
-.git
-.gitignore
-.env
-*.pth
-*.onnx
-media/
-staticfiles/
-node_modules/
-venv/
-.venv/
+*.pyd
+.Python
 *.egg-info
+*.egg
 dist/
 build/
-.pytest_cache
-.mypy_cache
-.ruff_cache
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Django
+db.sqlite3
+media/
+logs/
+*.log
+
+# ML/Training
+models/*.pth
+models/*.pt
+experiments/
+retina_dataset/
+*.onnx
+!models/.gitkeep
+
+# Documentation
+docs/
+README.md
+LICENSE
+*.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dev tools
+.pre-commit-config.yaml
+requirements-dev.txt
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
