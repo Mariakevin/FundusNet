@@ -17,6 +17,7 @@ from retina_app.constants import (
     CATEGORIES,
     MODEL_HEALTH_MIN_ACCURACY,
     MODEL_HEALTH_WINDOW,
+    MODEL_LABEL_MAP,
     MODEL_LIST,
     MODEL_NAME_MAP,
 )
@@ -32,6 +33,7 @@ _models_lock = threading.Lock()
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 MODEL_VERSIONS = {
+    "efficientnet_b0": "efficientnetb0-shifaa-eye-v1",
     "swin": "swin-tiny-retinopathy-v1",
     "maxvit": "maxvit-base-retinopathy-v1",
     "convnext_v2": "convnextv2-base-retinopathy-v1",
@@ -58,6 +60,7 @@ def _get_model_paths() -> dict[str, str]:
 
     models_dir = os.path.join(settings.BASE_DIR, "models")
     return {
+        "efficientnet_b0": os.path.join(models_dir, "efficientnet_b0_retinopathy.onnx"),
         "swin": os.path.join(models_dir, "swin_retinopathy.onnx"),
         "maxvit": os.path.join(models_dir, "maxvit_retinopathy.onnx"),
         "convnext_v2": os.path.join(models_dir, "convnext_v2_retinopathy.onnx"),
@@ -72,6 +75,7 @@ def _get_pytorch_model_paths() -> dict[str, str]:
 
     models_dir = os.path.join(settings.BASE_DIR, "models")
     return {
+        "efficientnet_b0": os.path.join(models_dir, "efficientnet_b0_retinopathy.pth"),
         "swin": os.path.join(models_dir, "swin_retinopathy.pth"),
         "maxvit": os.path.join(models_dir, "maxvit_retinopathy.pth"),
         "convnext_v2": os.path.join(models_dir, "convnext_v2_retinopathy.pth"),
@@ -139,14 +143,16 @@ def _run_onnx_inference(model_type: str, tensor: torch.Tensor) -> dict[str, Any]
         probs = exp_logits / exp_logits.sum(axis=-1, keepdims=True)
         probs = probs.tolist()
 
+        # Use model-specific label mapping if available, otherwise default to CATEGORIES
+        label_map = MODEL_LABEL_MAP.get(model_type, CATEGORIES)
         predicted_idx = int(np.argmax(probs))
         confidence = float(probs[predicted_idx])
-        label = CATEGORIES[predicted_idx]
+        label = label_map[predicted_idx]
 
         return {
             "label": label,
             "confidence": round(confidence, 4),
-            "probabilities": {CATEGORIES[i]: round(float(p), 4) for i, p in enumerate(probs)},
+            "probabilities": {label_map[i]: round(float(p), 4) for i, p in enumerate(probs)},
             "model": model_type,
         }
     except Exception as e:
@@ -330,14 +336,16 @@ class ModelManager:
                 logits = model(tensor)
                 probs = torch.softmax(logits, dim=-1).squeeze().cpu().numpy().tolist()
 
+                # Use model-specific label mapping if available, otherwise default to CATEGORIES
+                label_map = MODEL_LABEL_MAP.get(model_type, CATEGORIES)
                 predicted_idx = int(np.argmax(probs))
                 confidence = float(probs[predicted_idx])
-                label = CATEGORIES[predicted_idx]
+                label = label_map[predicted_idx]
 
                 return {
                     "label": label,
                     "confidence": round(confidence, 4),
-                    "probabilities": {CATEGORIES[i]: round(float(p), 4) for i, p in enumerate(probs)},
+                    "probabilities": {label_map[i]: round(float(p), 4) for i, p in enumerate(probs)},
                     "model": model_type,
                 }
         except Exception as e:

@@ -14,20 +14,21 @@ FUNDUS_MIN_TOP1_TOP2_RATIO = 1.8
 CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
 
 # --- Model Configuration ---
-# 5-model ensemble: dual-branch (CNN + Transformer) + hybrid architectures
-# Based on 2025-2026 research: SwinTiny + hybrid models dominate multi-label screening
-MODEL_LIST = ["swin", "maxvit", "convnext_v2", "efficientnet_v2", "deit"]
+# 6-model ensemble: pre-trained EfficientNet-B0 (95% acc) + dual-branch (CNN + Transformer) + hybrid architectures
+MODEL_LIST = ["efficientnet_b0", "swin", "maxvit", "convnext_v2", "efficientnet_v2", "deit"]
 
 MODEL_WEIGHTS = {
-    "swin": 0.25,  # Best single model on RFMiD benchmark (2026)
-    "maxvit": 0.25,  # Hybrid CNN-Transformer with multi-axis attention
-    "convnext_v2": 0.20,  # Strong CNN baseline
-    "efficientnet_v2": 0.15,  # Efficient deployment
-    "deit": 0.15,  # Vision Transformer baseline
+    "efficientnet_b0": 0.50,   # Pre-trained on exact 4-class dataset (95% acc)
+    "swin": 0.10,
+    "maxvit": 0.10,
+    "convnext_v2": 0.10,
+    "efficientnet_v2": 0.10,
+    "deit": 0.10,
 }
 
 # Mapping from short names to timm model identifiers
 MODEL_NAME_MAP = {
+    "efficientnet_b0": "efficientnet_b0",  # Not a timm model, but placeholder
     "swin": "swin_tiny_patch4_window7_224",
     "maxvit": "maxvit_base_tf_224",
     "convnext_v2": "convnextv2_base",
@@ -35,11 +36,17 @@ MODEL_NAME_MAP = {
     "deit": "deit3_base_patch16_224",
 }
 
+# Per-model label mapping for ONNX models with non-standard class ordering
+# Maps model_type -> list of CATEGORIES labels in ONNX output order
+MODEL_LABEL_MAP = {
+    "efficientnet_b0": ["Cataract", "Retina Disease", "Glaucoma", "Healthy"],
+}
+
 CLASS_PERFORMANCE_WEIGHTS = {
-    "Healthy": {"swin": 0.25, "maxvit": 0.25, "convnext_v2": 0.25, "efficientnet_v2": 0.15, "deit": 0.10},
-    "Cataract": {"swin": 0.25, "maxvit": 0.25, "convnext_v2": 0.20, "efficientnet_v2": 0.25, "deit": 0.05},
-    "Glaucoma": {"swin": 0.30, "maxvit": 0.25, "convnext_v2": 0.20, "efficientnet_v2": 0.15, "deit": 0.10},
-    "Retina Disease": {"swin": 0.25, "maxvit": 0.30, "convnext_v2": 0.20, "efficientnet_v2": 0.15, "deit": 0.10},
+    "Healthy": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
+    "Cataract": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
+    "Glaucoma": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
+    "Retina Disease": {"efficientnet_b0": 0.50, "swin": 0.10, "maxvit": 0.10, "convnext_v2": 0.10, "efficientnet_v2": 0.10, "deit": 0.10},
 }
 
 ENSEMBLE_MIN_MODELS = 2
