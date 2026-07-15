@@ -37,6 +37,9 @@ experiments/
 wandb/
 mlruns/
 *.log
+train.py
+export_onnx.py
+distill.py
 
 # Testing
 .pytest_cache/
