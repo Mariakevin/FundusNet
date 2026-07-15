@@ -21,7 +21,7 @@ from retina_app.services.exceptions import ImageValidationError
 logger = logging.getLogger("retina_app")
 
 
-def validate_image_file(image_path: str) -> None:
+def validate_image_file(image_path: str, pil_image: Image.Image = None) -> None:
     """Validate image file type, size, and dimensions."""
     if not os.path.exists(image_path):
         raise ImageValidationError(f"File not found: {image_path}")
@@ -40,17 +40,17 @@ def validate_image_file(image_path: str) -> None:
         raise ImageValidationError(f"Unsupported file type: {ext}. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}")
 
     try:
-        with Image.open(image_path) as img:
-            img = ImageOps.exif_transpose(img)
-            width, height = img.size
-            if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
-                raise ImageValidationError(
-                    f"Image too large. Maximum dimension is {MAX_IMAGE_DIMENSION}px. Got {width}x{height}px"
-                )
-            if width < MIN_IMAGE_DIMENSION or height < MIN_IMAGE_DIMENSION:
-                raise ImageValidationError(
-                    f"Image too small. Minimum dimension is {MIN_IMAGE_DIMENSION}px. Got {width}x{height}px"
-                )
+        img = pil_image if pil_image is not None else Image.open(image_path)
+        img = ImageOps.exif_transpose(img)
+        width, height = img.size
+        if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
+            raise ImageValidationError(
+                f"Image too large. Maximum dimension is {MAX_IMAGE_DIMENSION}px. Got {width}x{height}px"
+            )
+        if width < MIN_IMAGE_DIMENSION or height < MIN_IMAGE_DIMENSION:
+            raise ImageValidationError(
+                f"Image too small. Minimum dimension is {MIN_IMAGE_DIMENSION}px. Got {width}x{height}px"
+            )
     except ImageValidationError:
         raise
     except Exception as exc:
@@ -157,13 +157,20 @@ def assess_image_quality(image: np.ndarray) -> dict[str, Any]:
     }
 
 
-def check_image_quality(image_path: str, quality_threshold: float = 0.3) -> dict[str, Any]:
+def check_image_quality(image_path: str, quality_threshold: float = 0.3, pil_image: Image.Image = None) -> dict[str, Any]:
     """Check if image meets quality standards."""
-    image = cv2.imread(image_path)
-    if image is None:
-        return {"passed": False, "error": "Could not read image"}
+    if pil_image is not None:
+        image = np.array(pil_image)
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+    else:
+        image = cv2.imread(image_path)
+        if image is None:
+            return {"passed": False, "error": "Could not read image"}
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     quality = assess_image_quality(image)
     passed = quality["overall_quality"] >= quality_threshold
 

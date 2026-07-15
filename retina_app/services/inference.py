@@ -102,17 +102,26 @@ def predict_image(
     """
     start_time = time.time()
 
-    # ... (validation and preprocessing unchanged) ...
+    # Load image once and validate
+    try:
+        with Image.open(image_path) as img:
+            img.verify()
+            img.seek(0)
+            pil_image = Image.open(image_path)
+            pil_image.load()
+    except Exception as exc:
+        logger.warning("Corrupted image file %s: %s", image_path, exc)
+        raise ImageCorruptError(f"Corrupted or unreadable image: {exc}") from exc
 
     try:
-        validate_image_file(image_path)
+        validate_image_file(image_path, pil_image=pil_image)
     except ImageValidationError as exc:
         logger.warning(f"Image validation failed for {image_path}: {exc}")
         raise InferenceError(f"Invalid image: {exc}") from exc
 
     # --- Fundus Image Validation ---
     if FUNDUS_VALIDATION_ENABLED:
-        fundus_check = validate_fundus_image(image_path)
+        fundus_check = validate_fundus_image(image_path, pil_image=pil_image)
         if not fundus_check["is_fundus"]:
             logger.warning(
                 "Non-fundus image rejected: score=%.3f, signals=%s, path=%s",
@@ -123,14 +132,7 @@ def predict_image(
             raise NotAFundusImageError(fundus_check["message"])
 
     try:
-        with Image.open(image_path) as img:
-            img.verify()
-    except Exception as exc:
-        logger.warning("Corrupted image file %s: %s", image_path, exc)
-        raise ImageCorruptError(f"Corrupted or unreadable image: {exc}") from exc
-
-    try:
-        quality_check = check_image_quality(image_path, quality_threshold=0.25)
+        quality_check = check_image_quality(image_path, quality_threshold=0.25, pil_image=pil_image)
         if not quality_check["passed"]:
             logger.warning(f"Image quality check failed: {quality_check['quality_level']}")
     except Exception as exc:

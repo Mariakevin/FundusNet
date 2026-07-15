@@ -11,8 +11,12 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
+import tempfile
+import threading
 import time
 
 from django.conf import settings
@@ -23,57 +27,98 @@ from django.views.decorators.http import require_http_methods
 logger = logging.getLogger(__name__)
 
 
-# ── Rate Limiter ──────────────────────────────────────────────────────────────
+# ── API Key Authentication ─────────────────────────────────────────────────────
+
+API_KEY_HEADER = "X-API-Key"
+_rate_limit_lock = threading.Lock()
 
 
-class RateLimiter:
-    """Simple in-memory rate limiter using sliding window."""
+def _get_api_keys() -> set[str]:
+    """Load API keys from environment or settings."""
+    keys = set()
+    env_keys = os.environ.get("FUNDUSNET_API_KEYS", "")
+    if env_keys:
+        keys.update(k.strip() for k in env_keys.split(",") if k.strip())
+    settings_key = getattr(settings, "API_KEY", None)
+    if settings_key:
+        keys.add(settings_key)
+    return keys
 
-    def __init__(self, max_requests: int = 60, window_seconds: int = 60):
+
+def _check_api_key(request) -> JsonResponse | None:
+    """Verify API key. Returns None if valid, JsonResponse if not."""
+    api_keys = _get_api_keys()
+    if not api_keys:
+        return None  # No keys configured = open access
+
+    provided = request.META.get(f"HTTP_{API_KEY_HEADER.replace('-', '_').upper()}", "")
+    if not provided:
+        provided = request.headers.get(API_KEY_HEADER, "")
+
+    if not provided or provided not in api_keys:
+        return JsonResponse(
+            {"error": "Invalid or missing API key", "header": API_KEY_HEADER},
+            status=401,
+        )
+    return None
+
+
+# ── File-Based Rate Limiter (cross-worker) ─────────────────────────────────────
+
+
+class FileRateLimiter:
+    """File-based rate limiter that works across multiple Gunicorn workers."""
+
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = {}
-        self._lock = __import__("threading").Lock()
-        self._last_cleanup = time.time()
-        self._cleanup_interval = 300  # Clean up every 5 minutes
+        self._dir = os.path.join(tempfile.gettempdir(), "fundusnet_ratelimit")
+        os.makedirs(self._dir, exist_ok=True)
 
-    def _cleanup_old_keys(self):
-        """Remove old keys to prevent memory leak."""
-        now = time.time()
-        if now - self._last_cleanup < self._cleanup_interval:
-            return
-        cutoff = now - self.window_seconds * 2
-        self._requests = {
-            key: [t for t in times if t > cutoff]
-            for key, times in self._requests.items()
-            if times and times[-1] > cutoff
-        }
-        self._last_cleanup = now
+    def _get_file(self, key: str) -> str:
+        safe = hashlib.md5(key.encode()).hexdigest()
+        return os.path.join(self._dir, f"{safe}.json")
 
     def is_allowed(self, key: str) -> bool:
         now = time.time()
-        with self._lock:
-            self._cleanup_old_keys()
-            if key not in self._requests:
-                self._requests[key] = []
-            cutoff = now - self.window_seconds
-            self._requests[key] = [t for t in self._requests[key] if t > cutoff]
-            if len(self._requests[key]) >= self.max_requests:
+        with _rate_limit_lock:
+            filepath = self._get_file(key)
+            try:
+                if os.path.exists(filepath):
+                    with open(filepath, "r") as f:
+                        data = json.load(f)
+                    timestamps = [t for t in data.get("timestamps", []) if t > now - self.window_seconds]
+                else:
+                    timestamps = []
+            except (json.JSONDecodeError, OSError):
+                timestamps = []
+
+            if len(timestamps) >= self.max_requests:
                 return False
-            self._requests[key].append(now)
+
+            timestamps.append(now)
+            try:
+                with open(filepath, "w") as f:
+                    json.dump({"timestamps": timestamps}, f)
+            except OSError:
+                pass
             return True
 
     def get_remaining(self, key: str) -> int:
         now = time.time()
-        with self._lock:
-            if key not in self._requests:
-                return self.max_requests
-            cutoff = now - self.window_seconds
-            recent = [t for t in self._requests[key] if t > cutoff]
-            return max(0, self.max_requests - len(recent))
+        filepath = self._get_file(key)
+        try:
+            if os.path.exists(filepath):
+                with open(filepath, "r") as f:
+                    data = json.load(f)
+                timestamps = [t for t in data.get("timestamps", []) if t > now - self.window_seconds]
+                return max(0, self.max_requests - len(timestamps))
+        except (json.JSONDecodeError, OSError):
+            pass
+        return self.max_requests
 
 
-_rate_limiter = RateLimiter(max_requests=30, window_seconds=60)
+_rate_limiter = FileRateLimiter(max_requests=30, window_seconds=60)
 
 
 def _get_client_ip(request) -> str:
@@ -129,9 +174,14 @@ def predict_single(request):
     """Single image inference endpoint.
 
     POST /api/v1/predict/
+    Headers: X-API-Key (if configured)
     Body: multipart/form-data with 'image' field
     Optional params: use_ensemble, use_tta, use_gradcam
     """
+    auth_error = _check_api_key(request)
+    if auth_error:
+        return auth_error
+
     rate_limit = _rate_limit_check(request)
     if rate_limit:
         return rate_limit
@@ -200,8 +250,13 @@ def predict_batch(request):
     """Batch inference endpoint.
 
     POST /api/v1/predict/batch/
+    Headers: X-API-Key (if configured)
     Body: JSON with 'image_paths' list and optional config
     """
+    auth_error = _check_api_key(request)
+    if auth_error:
+        return auth_error
+
     rate_limit = _rate_limit_check(request)
     if rate_limit:
         return rate_limit

@@ -352,7 +352,7 @@ def _check_texture_regularity(image: np.ndarray, gray: np.ndarray = None) -> flo
         return 0.5
 
 
-def validate_fundus_image(image_path: str) -> dict[str, Any]:
+def validate_fundus_image(image_path: str, pil_image=None) -> dict[str, Any]:
     """Validate whether an image is a retinal fundus photograph.
 
     Uses 4 independent heuristic signals to determine if an image is
@@ -360,6 +360,7 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
 
     Args:
         image_path: Path to the image file
+        pil_image: Optional pre-loaded PIL Image (avoids re-reading)
 
     Returns:
         dict with keys:
@@ -369,18 +370,24 @@ def validate_fundus_image(image_path: str) -> dict[str, Any]:
             message (str): Human-readable result message
 
     """
-    # Read image with OpenCV
-    image = cv2.imread(image_path)
-    if image is None:
-        return {
-            "is_fundus": False,
-            "confidence": 0.0,
-            "signals": {},
-            "message": "Could not read image for fundus validation",
-        }
-
-    # Convert BGR to RGB
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # Use pre-loaded image or read from disk
+    if pil_image is not None:
+        import numpy as np
+        image = np.array(pil_image)
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+    else:
+        image = cv2.imread(image_path)
+        if image is None:
+            return {
+                "is_fundus": False,
+                "confidence": 0.0,
+                "signals": {},
+                "message": "Could not read image for fundus validation",
+            }
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Pre-compute color spaces once (avoids redundant conversions across 5 signals)
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)

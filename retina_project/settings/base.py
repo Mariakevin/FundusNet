@@ -145,6 +145,9 @@ LOGGING = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# API Key for authenticated endpoints (set via env var)
+API_KEY = os.getenv("FUNDUSNET_API_KEY", "")
+
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Strict"
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True

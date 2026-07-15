@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/media /app/models /app/logs && \
+    mkdir -p /app/media/uploads /app/media/gradcam /app/media/preprocessing_viz \
+             /app/models /app/logs /app/experiments && \
     chown -R appuser:appuser /app
 
 # Python dependencies
@@ -23,7 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Application code
 COPY . .
 
-# Collect static files
+# Run migrations and collect static
+RUN python manage.py migrate --noinput 2>/dev/null || true
 RUN python manage.py collectstatic --noinput 2>/dev/null || true
 
 # Set ownership
@@ -33,4 +35,5 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "retina_project.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+# Use gunicorn config file
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "retina_project.wsgi:application"]
