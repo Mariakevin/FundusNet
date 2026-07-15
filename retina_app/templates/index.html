@@ -75,28 +75,6 @@
     </div>
   </div>
 
-  <section class="retina-how" aria-label="How it works">
-    <h2 class="retina-how-title">How It Works</h2>
-    <div class="retina-how-grid">
-      <div class="retina-how-step">
-        <div class="retina-how-number">1</div>
-        <h3 class="retina-how-step-title">Upload</h3>
-        <p class="retina-how-step-desc">Drag and drop or select a retinal fundus photograph. JPG and PNG formats accepted.</p>
-      </div>
-      <div class="retina-how-step">
-        <div class="retina-how-number">2</div>
-        <h3 class="retina-how-step-title">Analyze</h3>
-        <p class="retina-how-step-desc">A 5-model ensemble processes the image with test-time augmentation and uncertainty estimation.</p>
-      </div>
-      <div class="retina-how-step">
-        <div class="retina-how-number">3</div>
-        <h3 class="retina-how-step-title">Review</h3>
-        <p class="retina-how-step-desc">View the classification, confidence score, and Grad-CAM heatmap showing which regions influenced the decision.</p>
-      </div>
-    </div>
-  </section>
-  {% endif %}
-
   {% if result %}
   <div class="retina-result" role="region" aria-label="Analysis result" aria-live="polite">
 
