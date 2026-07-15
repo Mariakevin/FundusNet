@@ -938,3 +938,70 @@ a:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-r
 
   .retina-card { padding: var(--space-5); }
 }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.retina-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.retina-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.retina-table th,
+.retina-table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+}
+.retina-table th {
+  background: var(--brand-faint);
+  font-weight: 600;
+  font-family: var(--font-display);
+  color: var(--text);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.retina-table tbody tr:hover { background: var(--surface-hover); }
+.retina-table tbody tr:last-child td { border-bottom: none; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.retina-btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  text-decoration: none;
+  font-family: var(--font-body);
+}
+.retina-btn-sm:hover { background: var(--brand-bg); border-color: var(--brand); color: var(--brand); }
+.retina-btn-xs {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  border-radius: var(--radius);
+  background: var(--brand-bg);
+  border: 1px solid var(--brand);
+  color: var(--brand);
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  text-decoration: none;
+  font-family: var(--font-body);
+}
+.retina-btn-xs:hover { background: var(--brand); color: #fff; }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.retina-empty {
+  text-align: center;
+  padding: var(--space-16) var(--space-4);
+  color: var(--text-muted);
+}
+.retina-empty svg { width: 48px; height: 48px; margin-bottom: var(--space-4); opacity: 0.4; }
+.retina-empty p { margin-bottom: var(--space-6); }

@@ -1,16 +1,20 @@
 """Views for FundusNet — single-page screening tool."""
 
+import csv
+import io
+import json
 import logging
 import mimetypes
 import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from .constants import CATEGORIES
 from .forms import ImageUploadForm
+from .models import PredictionRecord, UploadedImage
 from .services.exceptions import (
     ImageCorruptError,
     ImageDimensionError,
@@ -110,3 +114,75 @@ def protected_media(request: HttpRequest, path: str) -> HttpResponse:
         return response
     except FileNotFoundError:
         raise Http404("File not found")
+
+
+def history_view(request: HttpRequest) -> HttpResponse:
+    """Show recent prediction history."""
+    records = PredictionRecord.objects.filter(is_deleted=False).order_by("-created_at")[:20]
+    return render(request, "history.html", {"records": records})
+
+
+def export_view(request: HttpRequest, record_id: int) -> HttpResponse:
+    """Export a single prediction as JSON or CSV."""
+    fmt = request.GET.get("format", "json")
+
+    try:
+        record = PredictionRecord.objects.get(id=record_id, is_deleted=False)
+    except PredictionRecord.DoesNotExist:
+        raise Http404("Record not found")
+
+    data = {
+        "id": record.id,
+        "predicted_class": record.predicted_class,
+        "confidence": record.confidence,
+        "model_version": record.model_version,
+        "patient_identifier": record.patient_identifier,
+        "clinical_notes": record.clinical_notes,
+        "created_at": record.created_at.isoformat(),
+    }
+
+    if fmt == "csv":
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=data.keys())
+        writer.writeheader()
+        writer.writerow(data)
+        response = HttpResponse(output.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="prediction_{record_id}.csv"'
+        return response
+
+    response = HttpResponse(json.dumps(data, indent=2), content_type="application/json")
+    response["Content-Disposition"] = f'attachment; filename="prediction_{record_id}.json"'
+    return response
+
+
+def batch_view(request: HttpRequest) -> HttpResponse:
+    """Batch upload view for multiple images."""
+    results = []
+    error_message = None
+
+    if request.method == "POST":
+        files = request.FILES.getlist("images")
+        if not files:
+            error_message = "No images provided."
+        elif len(files) > 100:
+            error_message = "Maximum 100 images per batch."
+        else:
+            for f in files:
+                uploaded = UploadedImage.objects.create(image=f)
+                image_path = os.path.join(settings.MEDIA_ROOT, uploaded.image.name)
+                try:
+                    prediction_data = predict_image(image_path, use_ensemble=True, use_gradcam=False)
+                    results.append({
+                        "filename": f.name,
+                        "label": prediction_data["label"],
+                        "confidence": prediction_data["confidence"] * 100,
+                        "success": True,
+                    })
+                except Exception as exc:
+                    results.append({
+                        "filename": f.name,
+                        "error": str(exc),
+                        "success": False,
+                    })
+
+    return render(request, "batch.html", {"results": results, "error_message": error_message})

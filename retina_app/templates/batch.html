@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Batch Upload — FundusNet{% endblock %}
+{% block content %}
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div class="retina-page">
+  <header class="retina-header" role="banner">
+    <a href="/" class="retina-brand" aria-label="FundusNet home">
+      <div class="retina-brand-icon"><i data-lucide="eye" aria-hidden="true"></i></div>
+      <span class="retina-brand-name">FundusNet</span>
+    </a>
+    <div class="retina-header-actions">
+      <a href="/" class="retina-btn retina-btn-sm">Single Upload</a>
+      <a href="/history/" class="retina-btn retina-btn-sm">History</a>
+      <button id="dark-mode-toggle" class="retina-dark-toggle" aria-label="Toggle dark mode">
+        <i data-lucide="sun" class="dark-mode-icon-light" aria-hidden="true"></i>
+        <i data-lucide="moon" class="dark-mode-icon-dark" aria-hidden="true"></i>
+      </button>
+    </div>
+  </header>
+
+  <main id="main-content" role="main">
+    <h1>Batch Upload</h1>
+    <p>Upload multiple fundus images for screening.</p>
+
+    {% if error_message %}
+    <div class="retina-alert retina-alert-error" role="alert" aria-live="assertive">
+      <i data-lucide="alert-circle" aria-hidden="true"></i>
+      <span>{{ error_message }}</span>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="batch-form" class="retina-form">
+      {% csrf_token %}
+      <label for="id_images" class="retina-dropzone" id="batch-dropzone">
+        <div class="retina-dropzone-glow" aria-hidden="true"></div>
+        <input type="file" name="images" id="id_images" accept=".jpg,.jpeg,.png,.bmp,.webp,.tiff" multiple required>
+        <div id="batch-placeholder" class="retina-dropzone-inner">
+          <div class="retina-dropzone-icon"><i data-lucide="upload-cloud" aria-hidden="true"></i></div>
+          <div class="retina-dropzone-text">
+            <strong>Upload fundus images</strong>
+            <span>Select multiple JPG, PNG, BMP, WebP, or TIFF files (max 100)</span>
+          </div>
+        </div>
+        <div id="batch-preview" class="retina-preview hidden">
+          <p id="batch-count" class="retina-preview-hint"></p>
+        </div>
+      </label>
+
+      <button type="submit" class="retina-btn retina-btn-primary" id="batch-submit-btn" disabled>
+        <span id="batch-submit-text" class="retina-btn-text">Analyze All</span>
+        <span class="retina-btn-loader">
+          <i data-lucide="loader-2" aria-hidden="true"></i>
+          Analyzing&hellip;
+          <span id="batch-analysis-timer" class="hidden" aria-live="off"></span>
+        </span>
+      </button>
+    </form>
+
+    {% if results %}
+    <section class="retina-card" aria-label="Batch results">
+      <h2 class="retina-card-title">
+        <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+        Results ({{ results|length }} images)
+      </h2>
+      <div class="retina-table-wrap">
+        <table class="retina-table" aria-label="Batch prediction results">
+          <thead>
+            <tr>
+              <th scope="col">Filename</th>
+              <th scope="col">Prediction</th>
+              <th scope="col">Confidence</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results %}
+            <tr>
+              <td>{{ r.filename }}</td>
+              <td>
+                {% if r.success %}
+                <span class="retina-badge {% if r.label == 'Healthy' %}retina-badge-healthy{% else %}retina-badge-abnormal{% endif %}">
+                  {{ r.label }}
+                </span>
+                {% else %}&mdash;{% endif %}
+              </td>
+              <td>{% if r.success %}{{ r.confidence|floatformat:1 }}%{% else %}&mdash;{% endif %}</td>
+              <td>
+                {% if r.success %}
+                <span class="retina-badge retina-badge-healthy">OK</span>
+                {% else %}
+                <span class="retina-badge retina-badge-abnormal" title="{{ r.error }}">Error</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+  </main>
+
+  <footer class="retina-footer" role="contentinfo">
+    <span>FundusNet &middot; AI-Assisted Retinal Screening</span>
+  </footer>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var toggle = document.getElementById('dark-mode-toggle');
+  var html = document.documentElement;
+  var saved = localStorage.getItem('fundusnet-theme');
+  if (saved === 'dark') html.classList.add('dark-mode');
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      html.classList.toggle('dark-mode');
+      localStorage.setItem('fundusnet-theme', html.classList.contains('dark-mode') ? 'dark' : 'light');
+    });
+  }
+
+  var fileInput = document.getElementById('id_images');
+  var placeholder = document.getElementById('batch-placeholder');
+  var preview = document.getElementById('batch-preview');
+  var countEl = document.getElementById('batch-count');
+  var submitBtn = document.getElementById('batch-submit-btn');
+
+  if (fileInput) {
+    fileInput.addEventListener('change', function(e) {
+      var files = e.target.files;
+      if (files.length > 0) {
+        placeholder.style.display = 'none';
+        preview.classList.remove('hidden');
+        countEl.textContent = files.length + ' file' + (files.length > 1 ? 's' : '') + ' selected';
+        submitBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('batch-form').addEventListener('submit', function() {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('retina-btn-loading');
+    });
+  }
+});
+</script>
+{% endblock %}

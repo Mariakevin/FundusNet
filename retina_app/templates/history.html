@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Prediction History — FundusNet{% endblock %}
+{% block content %}
+<a href="/" class="skip-link">Skip to main content</a>
+<div class="retina-page">
+  <header class="retina-header" role="banner">
+    <a href="/" class="retina-brand" aria-label="FundusNet home">
+      <div class="retina-brand-icon"><i data-lucide="eye" aria-hidden="true"></i></div>
+      <span class="retina-brand-name">FundusNet</span>
+    </a>
+    <div class="retina-header-actions">
+      <a href="/" class="retina-btn retina-btn-sm">New Analysis</a>
+      <a href="/batch/" class="retina-btn retina-btn-sm">Batch Upload</a>
+      <button id="dark-mode-toggle" class="retina-dark-toggle" aria-label="Toggle dark mode">
+        <i data-lucide="sun" class="dark-mode-icon-light" aria-hidden="true"></i>
+        <i data-lucide="moon" class="dark-mode-icon-dark" aria-hidden="true"></i>
+      </button>
+    </div>
+  </header>
+
+  <main id="main-content" role="main">
+    <h1>Prediction History</h1>
+    <p>Recent screening results.</p>
+
+    {% if records %}
+    <div class="retina-table-wrap">
+      <table class="retina-table" aria-label="Prediction history">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Prediction</th>
+            <th scope="col">Confidence</th>
+            <th scope="col">Model</th>
+            <th scope="col">Export</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in records %}
+          <tr>
+            <td>{{ record.created_at|date:"M d, Y H:i" }}</td>
+            <td>
+              <span class="retina-badge {% if record.predicted_class == 'Healthy' %}retina-badge-healthy{% else %}retina-badge-abnormal{% endif %}">
+                {{ record.predicted_class }}
+              </span>
+            </td>
+            <td>{{ record.confidence|floatformat:1 }}%</td>
+            <td>{{ record.model_version }}</td>
+            <td>
+              <a href="/export/{{ record.id }}/?format=json" class="retina-btn retina-btn-xs" title="Export as JSON">JSON</a>
+              <a href="/export/{{ record.id }}/?format=csv" class="retina-btn retina-btn-xs" title="Export as CSV">CSV</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="retina-empty">
+      <i data-lucide="inbox" aria-hidden="true"></i>
+      <p>No predictions yet.</p>
+      <a href="/" class="retina-btn retina-btn-primary">Start Analyzing</a>
+    </div>
+    {% endif %}
+  </main>
+
+  <footer class="retina-footer" role="contentinfo">
+    <span>FundusNet &middot; AI-Assisted Retinal Screening</span>
+  </footer>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var toggle = document.getElementById('dark-mode-toggle');
+  var html = document.documentElement;
+  var saved = localStorage.getItem('fundusnet-theme');
+  if (saved === 'dark') html.classList.add('dark-mode');
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      html.classList.toggle('dark-mode');
+      localStorage.setItem('fundusnet-theme', html.classList.contains('dark-mode') ? 'dark' : 'light');
+    });
+  }
+});
+</script>
+{% endblock %}

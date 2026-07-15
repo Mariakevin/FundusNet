@@ -11,10 +11,13 @@ from .api import (
     predict_single,
     service_stats,
 )
-from .views import index_view, protected_media
+from .views import batch_view, export_view, history_view, index_view, protected_media
 
 urlpatterns = [
     path("", index_view, name="index"),
+    path("history/", history_view, name="history"),
+    path("export/<int:record_id>/", export_view, name="export"),
+    path("batch/", batch_view, name="batch"),
     path("media/<path:path>", protected_media, name="protected_media"),
     # API v1
     path("api/v1/", api_root, name="api-root"),
