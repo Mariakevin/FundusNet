@@ -47,11 +47,11 @@ FundusNet turns a fundus photograph into a **multi-class screening decision** �
 
 | | Single-model AI | FundusNet |
 |---|---|---|
-| **Architecture** | One model, one vote | 5-model selective ensemble (MaxViT hybrid) |
+| **Architecture** | One model, one vote | 5-model selective ensemble |
 | **Certainty** | Blind confidence | Uncertainty-aware TTA + MC Dropout |
 | **Medical Knowledge** | None | Disease co-occurrence matrix |
 | **Explainability** | None | Grad-CAM heatmaps |
-| **Image validation** | Accepts anything | 5-signal fundus heuristic |
+| **Image validation** | Accepts anything | 6-signal fundus heuristic |
 | **Inference speed** | CPU-bound | ONNX runtime (3-5x faster) |
 | **Reproducibility** | Manual | Seeded pipelines, CI-ready |
 
@@ -59,21 +59,22 @@ FundusNet turns a fundus photograph into a **multi-class screening decision** �
 
 ## Core Capabilities
 
-**4-model ensemble** — MaxViT (hybrid CNN-Transformer), ConvNeXt-V2, EfficientNetV2, DeiT-III
+**5-model ensemble** — Swin Transformer, MaxViT, ConvNeXt-V2, EfficientNetV2, DeiT-III
 
 ```mermaid
 graph TD
-    A[Fundus Photo] --> B[5-Signal Fundus Validation]
+    A[Fundus Photo] --> B[6-Signal Fundus Validation]
     B --> C[Quality Check]
     C --> D[Preprocessing]
-    D --> E[4-Model Ensemble]
+    D --> E[5-Model Ensemble]
 
-    E --> F0[MaxViT]
-    E --> F1[ConvNeXt-V2]
-    E --> F2[EfficientNetV2]
-    E --> F3[DeiT-III]
+    E --> F0[Swin Transformer]
+    E --> F1[MaxViT]
+    E --> F2[ConvNeXt-V2]
+    E --> F3[EfficientNetV2]
+    E --> F4[DeiT-III]
 
-    F0 & F1 & F2 & F3 --> G{Agreement >= 0.5?}
+    F0 & F1 & F2 & F3 & F4 --> G{Agreement >= 0.5?}
     G -->|Yes| H[Weighted Ensemble]
     G -->|No| I[Selective Filtering]
     I --> H
@@ -98,7 +99,7 @@ graph TD
 
 **Grad-CAM explainability** — Heatmaps overlay on the original image highlight which regions drove the model's decision, providing visual accountability for every prediction.
 
-**Fundus validation** — A 5-signal heuristic (color, circularity, edge density, green-channel variance) rejects non-fundus images before inference, preventing out-of-distribution errors.
+**Fundus validation** — A 6-signal heuristic (color, circularity, edge density, green-channel variance, channel ratio, texture) rejects non-fundus images before inference, preventing out-of-distribution errors.
 
 ---
 
@@ -111,25 +112,18 @@ FundusNet/
 │   │   ├── inference.py      # Main orchestrator
 │   │   ├── ensemble.py       # Selective ensemble + stacking meta-learner
 │   │   ├── gradcam.py        # Explainability heatmaps
-│   │   ├── uncertainty.py    # MC Dropout quantification
 │   │   ├── preprocessing.py  # CLAHE, ROI, quality checks
-│   │   ├── fundus_validator.py  # 5-signal heuristic
-│   │   ├── fundus_classifier.py # Binary fundus detector
+│   │   ├── fundus_validator.py  # 6-signal heuristic
 │   │   └── model_manager.py  # Lazy-loaded singleton + ONNX runtime
 │   ├── templates/            # SPA UI
 │   ├── tests/                # Test suite
-│   └── management/           # Custom commands
+│   ├── api.py               # REST API endpoints
+│   ├── constants.py         # Centralized configuration
+│   └── models.py            # Database models
 ├── retina_project/           # Django settings (dev/prod)
-├── evaluation/               # 5-fold CV, ablation, statistics
-│   ├── evaluate.py           # Main evaluation entry
-│   ├── metrics.py            # ECE, MCE, Brier, AUROC
-│   ├── statistics.py         # McNemar, DeLong, bootstrap CI
-│   ├── ablation.py           # Component contribution study
-│   └── figures.py            # Publication-quality plots
-├── retina_app/utils.py       # Shared: EMA, dataset, seed, create_model
-├── train.py                  # Training script (3 architectures)
-├── distill.py                # Knowledge distillation
-├── export_onnx.py            # ONNX export + INT8 quantization
+├── models/                   # ONNX model files (gitignored)
+├── media/                    # Uploaded files (runtime)
+├── gunicorn.conf.py          # Gunicorn configuration
 ├── Dockerfile                # Container deployment
 └── docker-compose.yml        # One-command deployment
 ```
@@ -140,12 +134,12 @@ FundusNet/
 
 | Class | Images | Proportion |
 |---|---|---|
-| **Healthy** | 299 | 50.1% |
-| **Cataract** | 100 | 16.7% |
-| **Glaucoma** | 99 | 16.6% |
-| **Diabetic Retinopathy** | 99 | 16.6% |
+| **Healthy** | 1,098 | 26.0% |
+| **Cataract** | 1,036 | 24.6% |
+| **Glaucoma** | 1,007 | 23.9% |
+| **Retina Disease** | 1,076 | 25.5% |
 
-597 fundus photographs across 4 classes. Class imbalance addressed via Focal Loss. Evaluation uses 5-fold stratified cross-validation (seed 42).
+4,217 fundus photographs across 4 classes. Dataset: [Eye Diseases Classification](https://www.kaggle.com/datasets/andrewmvd/eye-diseases-classification) on Kaggle.
 
 ---
 
@@ -172,33 +166,34 @@ python manage.py runserver
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
-### Training
+### API Usage
 
 ```bash
-python train.py --models convnext_v2 efficientnet_v2 deit --epochs 200
+# Single prediction (with API key)
+curl -X POST http://localhost:8000/api/v1/predict/ \
+  -H "X-API-Key: your-api-key" \
+  -F "image=@retinal_image.jpg"
+
+# Health check
+curl http://localhost:8000/api/v1/health/
 ```
 
-Supports Focal Loss, MixUp/CutMix augmentation, AdamW + cosine annealing, EMA, gradient clipping, and stratified K-fold CV.
+### ONNX Models
 
-### ONNX Export
+Place trained ONNX models in `models/` directory:
+- `swin_retinopathy.onnx`
+- `maxvit_retinopathy.onnx`
+- `convnext_v2_retinopathy.onnx`
+- `efficientnet_v2_retinopathy.onnx`
+- `deit_retinopathy.onnx`
 
-```bash
-python export_onnx.py --model efficientnet_v2 --verify --quantize
-```
+### Training (Google Colab)
 
-### Knowledge Distillation
-
-```bash
-python distill.py --teacher-models convnext_v2 efficientnet_v2 deit --student-model efficientnet_v2 --epochs 200
-```
-
-### Evaluation
-
-```bash
-python -m evaluation.evaluate --dataset retina_dataset --folds 5
-python -m evaluation.baselines --dataset retina_dataset --folds 5
-python -m evaluation.ablation --dataset retina_dataset --folds 5
-```
+Training is done separately in Google Colab. Use `colab_train.ipynb` to:
+1. Mount Google Drive
+2. Extract dataset
+3. Export trained models to ONNX
+4. Download ONNX files to local `models/` directory
 
 ### Tests
 
@@ -213,39 +208,8 @@ python manage.py test retina_app
 docker-compose up -d
 
 # Or with custom settings
-DEBUG=0 SECRET_KEY=your-key ALLOWED_HOSTS=your-domain.com docker-compose up -d
+FUNDUSNET_API_KEYS=your-key DJANGO_SECRET_KEY=your-secret docker-compose up -d
 ```
-
----
-
-## Benchmarks
-
-### Model Performance (5-fold CV, 597 images)
-
-| Model | Accuracy | F1 (macro) | AUROC | Params | Latency (CPU) |
-|---|---|---|---|---|---|
-| ConvNeXt-V2 | 89.3% | 0.87 | 0.96 | 88M | 45ms |
-| EfficientNetV2 | 87.8% | 0.85 | 0.95 | 54M | 32ms |
-| DeiT-III | 86.1% | 0.83 | 0.94 | 86M | 38ms |
-| **Ensemble (weighted)** | **91.2%** | **0.89** | **0.97** | 228M | 115ms |
-| **Ensemble (stacking)** | **92.0%** | **0.90** | **0.98** | 228M | 120ms |
-
-### Inference Speed
-
-| Backend | ConvNeXt-V2 | EfficientNetV2 | DeiT | Ensemble |
-|---|---|---|---|---|
-| PyTorch (CPU) | 45ms | 32ms | 38ms | 115ms |
-| ONNX Runtime (CPU) | 18ms | 12ms | 15ms | 45ms |
-| ONNX + INT8 | 12ms | 8ms | 10ms | 30ms |
-| PyTorch (CUDA) | 8ms | 5ms | 6ms | 19ms |
-
-### Uncertainty Refusal
-
-| Threshold | Accuracy | Refusal Rate | Effective Accuracy |
-|---|---|---|---|
-| 0.3 (strict) | 94.5% | 18.2% | 96.1% |
-| 0.5 (default) | 92.0% | 8.5% | 93.8% |
-| 0.7 (lenient) | 90.1% | 3.1% | 91.2% |
 
 ---
 
@@ -261,22 +225,23 @@ Settings live in `retina_project/settings/`:
 
 All ML and application constants are centralized in `retina_app/constants.py` — model weights, thresholds, cache limits, preprocessing settings. Single source of truth, zero duplication.
 
----
+### Environment Variables
 
-## Research-Grade Evaluation Suite
-
-| Module | What it measures |
-|---|---|
-| `metrics.py` | Accuracy, F1, ECE, MCE, Brier score, per-class metrics, AUROC |
-| `statistics.py` | McNemar's test, paired t-test, DeLong AUC test, bootstrap CI, Bonferroni correction |
-| `baselines.py` | Ensemble strategies + published literature comparison |
-| `ablation.py` | Contribution of each system component |
-| `figures.py` | Confusion matrices, ROC curves, reliability diagrams, Grad-CAM grids |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DJANGO_SECRET_KEY` | (required) | Django secret key |
+| `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Comma-separated allowed hosts |
+| `DJANGO_PRODUCTION` | `False` | Enable production mode |
+| `FUNDUSNET_API_KEYS` | (empty) | Comma-separated API keys |
+| `GUNICORN_BIND` | `0.0.0.0:8000` | Gunicorn bind address |
+| `GUNICORN_WORKERS` | `cpu*2+1` | Number of workers |
 
 ---
 
 ## Security
 
+- **API Key Authentication**: Protect prediction endpoints with `X-API-Key` header
+- **Rate Limiting**: File-based rate limiter (30 req/min per IP)
 - **Throttled auth**: django-axes brute-force protection (configurable lockout)
 - **Production hardening**: HSTS (1 year), CSP, X-Frame-Options DENY, Referrer Policy
 - **File validation**: MIME type check, path traversal protection, 10 MB size limit
@@ -284,11 +249,20 @@ All ML and application constants are centralized in `retina_app/constants.py` �
 
 ---
 
+## CI/CD
+
+GitHub Actions pipeline runs on every push:
+1. **Lint**: Ruff check + format
+2. **Test**: Django test suite
+3. **Docker**: Build image
+
+---
+
 ## Documentation
 
 | Document | Contents |
 |---|---|
-| [API Reference](docs/API.md) | All views, endpoints, forms, and templates |
+| [API Reference](docs/API.md) | All endpoints, authentication, rate limiting |
 | [Dataset Details](docs/DATASET.md) | Preprocessing, statistics, ethical considerations |
 | [Developer Guide](docs/DEVELOPER.md) | Workflow, testing, contribution guide |
 | [Paper Draft](docs/PAPER_DRAFT.md) | Full manuscript with methodology and results |
