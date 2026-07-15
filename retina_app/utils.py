@@ -9,7 +9,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 try:
-    from retina_app.constants import CATEGORIES
+    from retina_app.constants import CATEGORIES, MODEL_NAME_MAP
 except ImportError:
     CATEGORIES = ["Healthy", "Cataract", "Glaucoma", "Retina Disease"]
 
@@ -24,15 +24,6 @@ def setup_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
-
-MODEL_NAME_MAP = {
-    "swin": "swin_tiny_patch4_window7_224.ms_in22k",
-    "maxvit": "maxvit_base_224.sw_in1k",
-    "convnext_v2": "convnextv2_base.fcmae_ft_in1k",
-    "efficientnet_v2": "efficientnet_v2_m.orig_in21k_ft_in1k",
-    "deit": "deit3_base_patch16_224.fb_in22k_ft_in1k",
-}
 
 
 def create_model(model_name, num_classes, pretrained=True):

@@ -24,12 +24,12 @@
       {% csrf_token %}
       <label for="id_image" class="retina-dropzone" id="dropzone">
         <div class="retina-dropzone-glow" aria-hidden="true"></div>
-        <input type="file" name="image" id="id_image" accept=".jpg,.jpeg,.png" required>
+        <input type="file" name="image" id="id_image" accept=".jpg,.jpeg,.png,.bmp,.webp,.tiff" required>
         <div id="dropzone-placeholder" class="retina-dropzone-inner">
           <div class="retina-dropzone-icon"><i data-lucide="upload-cloud" aria-hidden="true"></i></div>
           <div class="retina-dropzone-text">
             <strong>Upload fundus image</strong>
-            <span>JPG or PNG &middot; up to 10MB</span>
+            <span>JPG, PNG, BMP, WebP, or TIFF &middot; up to 10MB</span>
           </div>
         </div>
         <div id="preview-container" class="retina-preview hidden">
@@ -224,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (fileInput) {
     var MAX_SIZE = 10 * 1024 * 1024;
-    var ALLOWED = ['image/jpeg', 'image/png'];
+    var ALLOWED = ['image/jpeg', 'image/png', 'image/bmp', 'image/webp', 'image/tiff'];
 
     function validateFile(file) {
       if (!file) return false;

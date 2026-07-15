@@ -48,6 +48,17 @@ PERMISSIONS_POLICY = {
     "camera": (),
 }
 
+# Content Security Policy
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://unpkg.com")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com")
+CSP_FONT_SRC = ("'self'", "https://fonts.gstatic.com")
+CSP_IMG_SRC = ("'self'", "data:")
+CSP_CONNECT_SRC = ("'self'",)
+
+# Proxy SSL header (for reverse proxy deployments)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Rate limiting - AXES for brute force protection (already installed)
 # Upload rate limiting handled in views.py
 

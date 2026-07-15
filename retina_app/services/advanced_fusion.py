@@ -24,62 +24,6 @@ import torch.nn as nn
 logger = logging.getLogger("retina_app")
 
 
-class LearnableFusionWeights(nn.Module):
-    """Learnable fusion weights for ensemble predictions.
-
-    Instead of fixed weights, this module learns optimal combination
-    of model predictions based on input features.
-
-    Reference: Res101-MViT-Ens (2026) - End-to-end dynamic learnable weight fusion
-    """
-
-    def __init__(self, n_models=5, n_classes=4, hidden_dim=64, dropout=0.3):
-        """
-        Args:
-            n_models: Number of models in ensemble
-            n_classes: Number of classification classes
-            hidden_dim: Hidden layer dimension
-            dropout: Dropout rate
-        """
-        super().__init__()
-
-        # Input: concatenation of all model probabilities + confidence
-        input_dim = n_models * n_classes + n_models  # probs + confidence per model
-
-        self.fusion_net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim // 2, n_models),
-            nn.Softmax(dim=-1),
-        )
-
-        self.n_models = n_models
-        self.n_classes = n_classes
-
-    def forward(self, model_probs_list, model_confidences):
-        """Compute learnable fusion weights.
-
-        Args:
-            model_probs_list: List of [n_classes] probability vectors
-            model_confidences: [n_models] confidence scores
-
-        Returns:
-            [n_models] fusion weights
-        """
-        # Concatenate all probabilities and confidences
-        all_probs = torch.cat(model_probs_list, dim=-1)
-        combined = torch.cat([all_probs, model_confidences], dim=-1)
-
-        # Get fusion weights
-        weights = self.fusion_net(combined)
-
-        return weights
-
-
 class DualBranchFusion(nn.Module):
     """Dual-branch feature fusion for CNN + Transformer models.
 

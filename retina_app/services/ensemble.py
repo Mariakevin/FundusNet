@@ -10,6 +10,7 @@ Upgrades:
 - Learnable fusion weights (Res101-MViT-Ens inspired)
 """
 
+import io
 import logging
 import os
 import pickle
@@ -18,6 +19,28 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+class RestrictedUnpickler(pickle.Unpickler):
+    """Restricts unpickling to safe types only."""
+
+    SAFE_TYPES = {
+        "builtins": {"set", "frozenset", "dict", "list", "tuple", "bool", "int", "float", "complex", "str", "bytes", "bytearray", "NoneType"},
+        "numpy": {"ndarray", "dtype", "float64", "float32", "int64", "int32", "bool_"},
+        "collections": {"OrderedDict"},
+    }
+
+    def find_class(self, module: str, name: str):
+        allowed = self.SAFE_TYPES.get(module, set())
+        if name in allowed:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"Forbidden: {module}.{name}")
+
+
+def safe_load_pickle(path: str):
+    """Load pickle file with restricted unpickler to prevent code execution."""
+    with open(path, "rb") as f:
+        return RestrictedUnpickler(f).load()
 from PIL import Image
 
 from retina_app.constants import (
@@ -294,8 +317,7 @@ class StackingMetaLearner:
     @classmethod
     def load(cls, path):
         """Load trained meta-learner."""
-        with open(path, "rb") as f:
-            data = pickle.load(f)
+        data = safe_load_pickle(path)
 
         learner = cls(
             meta_learner_type=data["meta_learner_type"],

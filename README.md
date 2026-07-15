@@ -24,15 +24,15 @@
 
 <p align="center">
   <b>A production-grade web application for automated retinal disease screening</b><br>
-  <i>4-model ensemble · ONNX runtime · Uncertainty-aware TTA · Disease co-occurrence · Grad-CAM explainability</i>
+  <i>5-model ensemble · ONNX runtime · Uncertainty-aware TTA · Disease co-occurrence · Grad-CAM explainability</i>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white">
   <img src="https://img.shields.io/badge/Django-5.2-green?logo=django&logoColor=white">
   <img src="https://img.shields.io/badge/PyTorch-2.7-red?logo=pytorch&logoColor=white">
   <img src="https://img.shields.io/badge/OpenCV-4.12-blueviolet?logo=opencv&logoColor=white">
-  <img src="https://img.shields.io/badge/Model_Ensemble-4_models-important">
+  <img src="https://img.shields.io/badge/Model_Ensemble-5_models-important">
   <img src="https://img.shields.io/badge/Explainability-GradCAM-success">
   <img src="https://img.shields.io/badge/License-Proprietary-lightgrey">
 </p>
@@ -41,13 +41,13 @@
 
 ## Overview
 
-FundusNet turns a fundus photograph into a **multi-class screening decision** — Healthy, Cataract, Glaucoma, or Retina Disease — with calibrated confidence, uncertainty awareness, and visual heatmaps. Designed for clinical research, it combines **4 modern deep learning architectures** into a selective ensemble with ONNX runtime for fast inference.
+FundusNet turns a fundus photograph into a **multi-class screening decision** — Healthy, Cataract, Glaucoma, or Retina Disease — with calibrated confidence, uncertainty awareness, and visual heatmaps. Designed for clinical research, it combines **5 modern deep learning architectures** into a selective ensemble with ONNX runtime for fast inference.
 
 ### What makes it different
 
 | | Single-model AI | FundusNet |
 |---|---|---|
-| **Architecture** | One model, one vote | 4-model selective ensemble (MaxViT hybrid) |
+| **Architecture** | One model, one vote | 5-model selective ensemble (MaxViT hybrid) |
 | **Certainty** | Blind confidence | Uncertainty-aware TTA + MC Dropout |
 | **Medical Knowledge** | None | Disease co-occurrence matrix |
 | **Explainability** | None | Grad-CAM heatmaps |

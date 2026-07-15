@@ -34,10 +34,26 @@ class RateLimiter:
         self.window_seconds = window_seconds
         self._requests: dict[str, list[float]] = {}
         self._lock = __import__("threading").Lock()
+        self._last_cleanup = time.time()
+        self._cleanup_interval = 300  # Clean up every 5 minutes
+
+    def _cleanup_old_keys(self):
+        """Remove old keys to prevent memory leak."""
+        now = time.time()
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+        cutoff = now - self.window_seconds * 2
+        self._requests = {
+            key: [t for t in times if t > cutoff]
+            for key, times in self._requests.items()
+            if times and times[-1] > cutoff
+        }
+        self._last_cleanup = now
 
     def is_allowed(self, key: str) -> bool:
         now = time.time()
         with self._lock:
+            self._cleanup_old_keys()
             if key not in self._requests:
                 self._requests[key] = []
             cutoff = now - self.window_seconds
@@ -206,13 +222,13 @@ def predict_batch(request):
 
     # Validate all paths exist and are within allowed directories
     allowed_roots = [
-        os.path.normpath(settings.MEDIA_ROOT),
-        os.path.normpath(os.path.join(settings.BASE_DIR, "retina_dataset")),
+        os.path.realpath(settings.MEDIA_ROOT),
+        os.path.realpath(os.path.join(settings.BASE_DIR, "retina_dataset")),
     ]
 
     def _is_path_allowed(path: str) -> bool:
-        abs_path = os.path.abspath(path)
-        return any(abs_path.startswith(root) for root in allowed_roots)
+        real_path = os.path.realpath(path)
+        return any(real_path.startswith(root) for root in allowed_roots)
 
     invalid_paths = [p for p in image_paths if not os.path.exists(p) or not _is_path_allowed(p)]
     if invalid_paths:

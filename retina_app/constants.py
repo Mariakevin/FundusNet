@@ -26,6 +26,15 @@ MODEL_WEIGHTS = {
     "deit": 0.15,  # Vision Transformer baseline
 }
 
+# Mapping from short names to timm model identifiers
+MODEL_NAME_MAP = {
+    "swin": "swin_tiny_patch4_window7_224.ms_in22k",
+    "maxvit": "maxvit_base_224.sw_in1k",
+    "convnext_v2": "convnextv2_base.fcmae_ft_in1k",
+    "efficientnet_v2": "efficientnet_v2_m.orig_in21k_ft_in1k",
+    "deit": "deit3_base_patch16_224.fb_in22k_ft_in1k",
+}
+
 CLASS_PERFORMANCE_WEIGHTS = {
     "Healthy": {"swin": 0.25, "maxvit": 0.25, "convnext_v2": 0.25, "efficientnet_v2": 0.15, "deit": 0.10},
     "Cataract": {"swin": 0.25, "maxvit": 0.25, "convnext_v2": 0.20, "efficientnet_v2": 0.25, "deit": 0.05},

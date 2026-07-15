@@ -18,6 +18,7 @@ from retina_app.constants import (
     MODEL_HEALTH_MIN_ACCURACY,
     MODEL_HEALTH_WINDOW,
     MODEL_LIST,
+    MODEL_NAME_MAP,
 )
 
 logger = logging.getLogger("retina_app")
@@ -78,15 +79,8 @@ def _create_timm_model(model_type, num_classes=4, pretrained=False):
     try:
         import timm
 
-        model_map = {
-            "swin": "swin_tiny_patch4_window7_224.ms_in22k",
-            "maxvit": "maxvit_base_224.sw_in1k",
-            "convnext_v2": "convnextv2_base.fcmae_ft_in1k",
-            "efficientnet_v2": "efficientnet_v2_m.orig_in21k_ft_in1k",
-            "deit": "deit3_base_patch16_224.fb_in22k_ft_in1k",
-        }
-        if model_type in model_map:
-            model = timm.create_model(model_map[model_type], pretrained=pretrained, num_classes=num_classes)
+        if model_type in MODEL_NAME_MAP:
+            model = timm.create_model(MODEL_NAME_MAP[model_type], pretrained=pretrained, num_classes=num_classes)
             return model
     except ImportError:
         pass
