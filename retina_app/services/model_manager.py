@@ -23,6 +23,12 @@ from retina_app.constants import (
 
 logger = logging.getLogger("retina_app")
 
+# --- Model Loading State ---
+_models_loading = False
+_models_loaded = False
+_models_load_error = None
+_models_lock = threading.Lock()
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 MODEL_VERSIONS = {
@@ -433,3 +439,54 @@ def get_health_tracker() -> ModelHealthTracker:
             if _health_tracker is None:
                 _health_tracker = ModelHealthTracker()
     return _health_tracker
+
+
+def get_model_loading_status() -> dict:
+    """Return current model loading status for the UI."""
+    with _models_lock:
+        return {
+            "loading": _models_loading,
+            "loaded": _models_loaded,
+            "error": _models_load_error,
+            "n_models": len(_model_manager._models) if _model_manager else 0,
+        }
+
+
+def preload_models_background() -> None:
+    """Preload all models in background threads at server startup."""
+    global _models_loading, _models_loaded, _models_load_error
+
+    with _models_lock:
+        if _models_loading or _models_loaded:
+            return
+        _models_loading = True
+        _models_load_error = None
+
+    def _do_preload():
+        global _models_loading, _models_loaded, _models_load_error
+        try:
+            manager = get_model_manager()
+            loaded = 0
+            for model_type in MODEL_LIST:
+                try:
+                    manager.get_model(model_type)
+                    loaded += 1
+                    logger.info("Preloaded model %s (%d/%d)", model_type, loaded, len(MODEL_LIST))
+                except Exception as exc:
+                    logger.warning("Failed to preload %s: %s", model_type, exc)
+
+            with _models_lock:
+                _models_loaded = True
+                _models_loading = False
+                if loaded == 0:
+                    _models_load_error = "No models could be loaded"
+            logger.info("Model preloading complete: %d/%d loaded", loaded, len(MODEL_LIST))
+        except Exception as exc:
+            with _models_lock:
+                _models_loading = False
+                _models_load_error = str(exc)
+            logger.error("Model preloading failed: %s", exc)
+
+    thread = threading.Thread(target=_do_preload, daemon=True, name="model-preloader")
+    thread.start()
+    logger.info("Started background model preloader thread")

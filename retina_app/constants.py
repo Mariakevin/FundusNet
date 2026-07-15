@@ -48,7 +48,7 @@ MAX_WORKERS = 4
 # --- Pretrained Model Fallback ---
 # When True, downloads pretrained models from HuggingFace when no trained ONNX/checkpoint exists.
 # Set to False in development to avoid slow downloads (~300s per model).
-PRETRAINED_FALLBACK_ENABLED = False
+PRETRAINED_FALLBACK_ENABLED = True
 
 # --- Learnable Fusion (Dynamic Weighting) ---
 LEARNABLE_FUSION_ENABLED = True

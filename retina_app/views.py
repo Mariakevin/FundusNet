@@ -29,6 +29,8 @@ from .services.inference import predict_image
 
 logger = logging.getLogger("retina_app")
 
+from .services.model_manager import get_model_loading_status
+
 
 def index_view(request: HttpRequest) -> HttpResponse:
     """Single-page view: upload zone + inline result display."""
@@ -83,6 +85,8 @@ def index_view(request: HttpRequest) -> HttpResponse:
         else:
             error_message = "Invalid image. Please select a JPG or PNG file under 10MB."
 
+    model_status = get_model_loading_status()
+
     return render(
         request,
         "index.html",
@@ -90,6 +94,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
             "result": result,
             "error_message": error_message,
             "image_url": image_url,
+            "model_status": model_status,
         },
     )
 
