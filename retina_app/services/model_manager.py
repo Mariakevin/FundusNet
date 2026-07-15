@@ -261,7 +261,11 @@ class ModelManager:
             model_path = pytorch_paths.get(model_type, "")
             model, checkpoint_loaded, _ = _load_model_with_checkpoint(model_type, model_path)
             if not checkpoint_loaded:
-                logger.warning("No valid checkpoint for %s, falling back to ImageNet pretrained", model_type)
+                logger.warning(
+                    "No valid checkpoint for %s — attempting pretrained fallback (PRETRAINED_FALLBACK_ENABLED=%s)",
+                    model_type,
+                    os.environ.get("FUNDUSNET_PRETRAINED", "check constants.py"),
+                )
                 return self._load_pretrained(model_type)
             model.to(DEVICE)
             model.eval()
@@ -274,6 +278,21 @@ class ModelManager:
 
     def _load_pretrained(self, model_type: str) -> nn.Module:
         """Load pre-trained model with timm."""
+        from retina_app.constants import PRETRAINED_FALLBACK_ENABLED
+
+        if not PRETRAINED_FALLBACK_ENABLED:
+            logger.warning(
+                "PRETRAINED_FALLBACK_ENABLED=False — loading %s with random weights (no download)",
+                model_type,
+            )
+            model = _create_timm_model(model_type, num_classes=len(CATEGORIES), pretrained=False)
+            if model is None:
+                raise ValueError(f"Unknown model type: {model_type}")
+            model.to(DEVICE)
+            model.eval()
+            self._model_types[model_type] = "random"
+            return model
+
         logger.info("Loading pre-trained %s for demo", model_type)
         model = _create_timm_model(model_type, num_classes=len(CATEGORIES), pretrained=True)
         if model is None:

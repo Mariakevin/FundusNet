@@ -45,6 +45,11 @@ CLASS_PERFORMANCE_WEIGHTS = {
 ENSEMBLE_MIN_MODELS = 2
 MAX_WORKERS = 4
 
+# --- Pretrained Model Fallback ---
+# When True, downloads pretrained models from HuggingFace when no trained ONNX/checkpoint exists.
+# Set to False in development to avoid slow downloads (~300s per model).
+PRETRAINED_FALLBACK_ENABLED = False
+
 # --- Learnable Fusion (Dynamic Weighting) ---
 LEARNABLE_FUSION_ENABLED = True
 LEARNABLE_FUSION_MLP_HIDDEN = 64
