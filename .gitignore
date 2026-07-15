@@ -1,30 +1,49 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 dist/
 build/
 *.egg
+*.whl
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Virtual environment
 venv/
+.venv/
+env/
 .env
 
 # Django
 db.sqlite3
+db.sqlite3-journal
 media/uploads/
 media/uploaded_images/
 media/gradcam/
 media/preprocessing_viz/
+media/*.png
+media/*.jpg
 
 # ML model files
 models/*.pth
+models/*.onnx
 *.pth
+*.onnx
+experiments/
+
+# Training outputs
+wandb/
+mlruns/
+*.log
 
 # Testing
 .pytest_cache/
 htmlcov/
 .coverage
+.coverage.*
+coverage.xml
 
 # Evaluation output
 evaluation_results/
@@ -32,6 +51,7 @@ figures_output/
 
 # Environment
 .env
+.env.local
 
 # IDE
 .vscode/
@@ -39,18 +59,33 @@ figures_output/
 *.swp
 *.swo
 *~
+.project
+.settings/
 
 # Logs
 logs/
+*.log
 
 # Tool directories
 .playwright-mcp/
 .impeccable/
 .opencode/
+.ruff_cache/
 
-# Dataset — download separately (see scripts/download_dataset.py)
+# Dataset — download separately (see README)
 retina_dataset/
 !retina_dataset/.gitkeep
 
 # Documentation screenshots (keep in docs/screenshots/)
 docs/screenshots/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Colab
+colab_train.ipynb
