@@ -62,7 +62,7 @@ from retina_app.constants import (
 )
 from retina_app.services.exceptions import InferenceError
 from retina_app.services.model_manager import DEVICE
-from retina_app.services.transforms import TRANSFORM, TRANSFORMS
+from retina_app.services.transforms import TRANSFORM, TRANSFORM_RAW, TRANSFORMS
 
 logger = logging.getLogger("retina_app")
 
@@ -373,7 +373,7 @@ def apply_temperature_scaling(logits, temperature=TEMPERATURE_SCALING):
     return torch.softmax(scaled_logits, dim=1)
 
 
-def _predict_single_model(model, image_path, use_tta=False):
+def _predict_single_model(model, image_path, use_tta=False, model_type=None):
     """Run inference on a single model with optional TTA."""
     with Image.open(image_path) as pil_img:
         image = pil_img.convert("RGB")
@@ -459,7 +459,11 @@ def _predict_single_model(model, image_path, use_tta=False):
                 result["warnings"] = [f"Transform {t} failed" for t in failed_transforms]
             return result
         else:
-            input_tensor = TRANSFORM(image).unsqueeze(0).to(DEVICE)
+            # Use raw transform (no normalization) for models trained without ImageNet norm
+            if model_type == "efficientnet_b0":
+                input_tensor = TRANSFORM_RAW(image).unsqueeze(0).to(DEVICE)
+            else:
+                input_tensor = TRANSFORM(image).unsqueeze(0).to(DEVICE)
             with torch.no_grad():
                 output = model(input_tensor)
                 if isinstance(output, tuple):
@@ -505,7 +509,7 @@ def predict_models_parallel(models, image_path, use_tta, executor):
     def predict_wrapper(model_type_and_model):
         model_type, model = model_type_and_model
         try:
-            pred = _predict_single_model(model, image_path, use_tta=use_tta)
+            pred = _predict_single_model(model, image_path, use_tta=use_tta, model_type=model_type)
             return (model_type, pred, None)
         except Exception as exc:
             return (model_type, None, exc)

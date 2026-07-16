@@ -18,6 +18,14 @@ TRANSFORM = transforms.Compose(
     ]
 )
 
+# Transform for models trained WITHOUT ImageNet normalization (e.g., efficientnet_b0)
+TRANSFORM_RAW = transforms.Compose(
+    [
+        _PRERESIZE_224,
+        transforms.ToTensor(),
+    ]
+)
+
 # TTA transforms: avoid redundant resize by reusing pre-resize
 TRANSFORMS = {
     "standard": TRANSFORM,
