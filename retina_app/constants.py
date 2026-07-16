@@ -29,8 +29,9 @@ MODEL_NAME_MAP = {
 
 # Per-model label mapping for ONNX models with non-standard class ordering
 # Maps model_type -> list of CATEGORIES labels in ONNX output order
+# Determined via diagnostic testing: model outputs [Healthy, Cataract, Glaucoma, Retina Disease]
 MODEL_LABEL_MAP = {
-    "efficientnet_b0": ["Cataract", "Retina Disease", "Glaucoma", "Healthy"],
+    "efficientnet_b0": ["Healthy", "Cataract", "Glaucoma", "Retina Disease"],
 }
 
 CLASS_PERFORMANCE_WEIGHTS = {
