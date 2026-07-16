@@ -51,6 +51,7 @@ from retina_app.constants import (
     LEARNABLE_FUSION_ENABLED,
     LEARNABLE_FUSION_MLP_HIDDEN,
     MC_DROPOUT_PASSES,
+    MODEL_LABEL_MAP,
     MODEL_LIST,
     MODEL_WEIGHTS,
     STACKING_ENABLED,
@@ -62,9 +63,15 @@ from retina_app.constants import (
 )
 from retina_app.services.exceptions import InferenceError
 from retina_app.services.model_manager import DEVICE
-from retina_app.services.transforms import TRANSFORM, TRANSFORM_RAW, TRANSFORMS
+from retina_app.services.transforms import TRANSFORM, TRANSFORMS
 
 logger = logging.getLogger("retina_app")
+
+
+def _get_model_label(model_type: str, predicted_idx: int) -> str:
+    """Look up label using MODEL_LABEL_MAP for the given model, falling back to CATEGORIES."""
+    label_map = MODEL_LABEL_MAP.get(model_type, CATEGORIES)
+    return label_map[predicted_idx]
 
 
 def _apply_disease_co_occurrence(probs):
@@ -449,7 +456,7 @@ def _predict_single_model(model, image_path, use_tta=False, model_type=None):
             confidence = avg_probs[max_idx]
 
             result = {
-                "label": CATEGORIES[max_idx],
+                "label": _get_model_label(model_type, max_idx),
                 "confidence": float(confidence),
                 "probabilities": avg_probs,
                 "logits": avg_logits,
@@ -459,11 +466,8 @@ def _predict_single_model(model, image_path, use_tta=False, model_type=None):
                 result["warnings"] = [f"Transform {t} failed" for t in failed_transforms]
             return result
         else:
-            # Use raw transform (no normalization) for models trained without ImageNet norm
-            if model_type == "efficientnet_b0":
-                input_tensor = TRANSFORM_RAW(image).unsqueeze(0).to(DEVICE)
-            else:
-                input_tensor = TRANSFORM(image).unsqueeze(0).to(DEVICE)
+            # All models (including efficientnet_b0) use ImageNet-normalized input
+            input_tensor = TRANSFORM(image).unsqueeze(0).to(DEVICE)
             with torch.no_grad():
                 output = model(input_tensor)
                 if isinstance(output, tuple):
@@ -495,7 +499,7 @@ def _predict_single_model(model, image_path, use_tta=False, model_type=None):
             max_idx = probs_list.index(max(probs_list))
 
             return {
-                "label": CATEGORIES[max_idx],
+                "label": _get_model_label(model_type, max_idx),
                 "confidence": float(max(probs_list)),
                 "probabilities": probs_list,
                 "logits": logits,
@@ -534,6 +538,10 @@ def ensemble_predictions(predictions):
     n_models = len(predictions)
     n_classes = len(CATEGORIES)
 
+    # Ensemble label map: use first model's label map (all models share the same output order)
+    _first_model_type = predictions[0][0]
+    _ensemble_label_map = MODEL_LABEL_MAP.get(_first_model_type, CATEGORIES)
+
     # Try stacking meta-learner first
     if STACKING_ENABLED:
         meta_learner = get_meta_learner()
@@ -553,7 +561,7 @@ def ensemble_predictions(predictions):
                     ensemble_uncertainty = 1.0 - max(stacked_probs)
 
                     return {
-                        "label": CATEGORIES[max_idx],
+                        "label": _ensemble_label_map[max_idx],
                         "confidence": float(stacked_probs[max_idx]),
                         "avg_model_confidence": avg_confidence,
                         "n_models": n_models,
@@ -599,7 +607,7 @@ def ensemble_predictions(predictions):
                 avg_confidence = sum(pred["confidence"] for _, pred in predictions) / n_models
 
                 return {
-                    "label": CATEGORIES[max_idx],
+                    "label": _ensemble_label_map[max_idx],
                     "confidence": float(weighted_probs[max_idx]),
                     "avg_model_confidence": avg_confidence,
                     "n_models": n_models,
@@ -665,7 +673,7 @@ def ensemble_predictions(predictions):
     ensemble_uncertainty = 1.0 - max(normalized_probs)
 
     return {
-        "label": CATEGORIES[max_idx],
+        "label": _ensemble_label_map[max_idx],
         "confidence": normalized_probs[max_idx],
         "avg_model_confidence": avg_confidence,
         "n_models": n_models,
