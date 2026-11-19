@@ -1,8 +1,8 @@
 # FundusNet: A Selective Ensemble Framework with Uncertainty Quantification for Multi-Class Retinal Disease Screening
 
-**Authors:** [Author Names]
-**Affiliation:** [Institution]
-**Corresponding Author:** [Email]
+**Authors:** [Maria Kevin]
+**Affiliation:** [SRM Valliammai Engineering College]
+**Corresponding Author:** [mariakevin0504@gmail.com]
 
 ---
 
